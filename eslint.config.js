@@ -5,7 +5,14 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist", "node_modules", "playwright-report", "test-results", "public/mockServiceWorker.js"],
+    ignores: [
+      "dist",
+      "node_modules",
+      "playwright-report",
+      "test-results",
+      "public/mockServiceWorker.js",
+      "e2e/mock-live-market.mjs",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
