@@ -3,6 +3,7 @@ import type {
   InvokeResult,
   Listing,
   MarketError,
+  MarketHealth,
   Occupancy,
   Receipt,
   Wallet,
@@ -79,6 +80,45 @@ export async function fetchWallet(id: string): Promise<Wallet> {
   return body.wallet;
 }
 
+export async function createTreasury(label?: string): Promise<Wallet> {
+  const response = await fetch(`${marketUrl()}/wallets/treasury`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(label ? { label } : {}),
+  });
+  const body = await readJson<{ wallet?: Wallet; error?: MarketError }>(response);
+  if (!response.ok || !body.wallet) {
+    throw new Error(asError(body, "create treasury failed").message);
+  }
+  return body.wallet;
+}
+
+export async function createAgent(input: { spendCap: string; label?: string; treasuryId?: string }): Promise<Wallet> {
+  const response = await fetch(`${marketUrl()}/wallets/agent`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = await readJson<{ wallet?: Wallet; error?: MarketError }>(response);
+  if (!response.ok || !body.wallet) {
+    throw new Error(asError(body, "create agent failed").message);
+  }
+  return body.wallet;
+}
+
+export async function fundWallet(id: string, amount: string): Promise<Wallet> {
+  const response = await fetch(`${marketUrl()}/wallets/${id}/fund`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ amount }),
+  });
+  const body = await readJson<{ wallet?: Wallet; error?: MarketError }>(response);
+  if (!response.ok || !body.wallet) {
+    throw new Error(asError(body, `fund ${id} failed`).message);
+  }
+  return body.wallet;
+}
+
 export async function fetchReceipt(id: string): Promise<Receipt> {
   const response = await fetch(`${marketUrl()}/receipts/${id}`);
   const body = await readJson<{ receipt?: Receipt; error?: MarketError }>(response);
@@ -105,7 +145,7 @@ export async function endReceipt(id: string): Promise<{
   return { receipt: body.receipt, occupancy: body.occupancy };
 }
 
-export async function fetchHealth(): Promise<{ ok: boolean; service?: string; stagingNetwork?: string }> {
+export async function fetchHealth(): Promise<MarketHealth> {
   const response = await fetch(`${marketUrl()}/health`);
   return readJson(response);
 }

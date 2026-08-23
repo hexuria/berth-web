@@ -1,6 +1,6 @@
 import { DEMO_BERTHOS_URL, DEMO_WALLET_ID } from "../lib/config";
+import { defaultListingPrice, usdcAddressFor } from "../lib/listing-defaults";
 import type { EligibilityAttestation, Listing, Wallet } from "../lib/types";
-import { BASE_SEPOLIA_CAIP2, USDC_BASE_SEPOLIA } from "../lib/types";
 
 export const DEMO_AGENT_ADDRESS = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const DEMO_SELLER_ADDRESS = "0x1111111111111111111111111111111111111111";
@@ -69,7 +69,7 @@ export function seedListings(): Listing[] {
       kind: "http",
       title: "weather.now",
       description: "Current conditions (demo HTTP SKU)",
-      price: { amount: "1000", asset: "USDC", network: BASE_SEPOLIA_CAIP2 },
+      price: defaultListingPrice(),
       payTo: DEMO_SELLER_ADDRESS,
       endpoint: { url: "https://api.example.com/weather", method: "GET" },
       createdAt: "2026-08-23T07:00:00.000Z",
@@ -79,7 +79,7 @@ export function seedListings(): Listing[] {
       kind: "desktop.linux",
       title: "gpu-box.session",
       description: "Isolated Linux guest fulfilled by a Berthos node",
-      price: { amount: "1000", asset: "USDC", network: BASE_SEPOLIA_CAIP2 },
+      price: defaultListingPrice(),
       payTo: DEMO_SELLER_ADDRESS,
       class: "vm-guest",
       fulfillment: {
@@ -97,7 +97,7 @@ export function seedListings(): Listing[] {
       kind: "laptop",
       title: "daily-driver.laptop",
       description: "Must never be offered as a public listing",
-      price: { amount: "1000", asset: "USDC", network: BASE_SEPOLIA_CAIP2 },
+      price: defaultListingPrice(),
       payTo: DEMO_SELLER_ADDRESS,
       class: "laptop",
       createdAt: "2026-08-23T07:00:00.000Z",
@@ -110,7 +110,7 @@ export function quoteRequirements(listing: Listing) {
     scheme: "exact" as const,
     network: listing.price.network,
     amount: listing.price.amount,
-    asset: USDC_BASE_SEPOLIA,
+    asset: usdcAddressFor(listing.price.network),
     payTo: listing.payTo,
     maxTimeoutSeconds: 60,
     extra: {

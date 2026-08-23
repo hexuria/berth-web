@@ -107,15 +107,17 @@ export VITE_MARKET_URL=http://127.0.0.1:8787
 npm run dev
 ```
 
-The page stays on `http://127.0.0.1:5173`. It fetches **same origin** `/mkt/*` and `/bos/*`. Vite rewrites those to `:8787` and `:7432`. A direct browser call to `http://127.0.0.1:8787` fails CORS (`Failed to fetch`); the proxy is the supported live path. CI leaves the env vars unset and keeps MSW.
+**Live = `VITE_MARKET_URL` + the Vite proxy.** The page stays on `http://127.0.0.1:5173`. It fetches **same origin** `/mkt/*` and `/bos/*`. Vite rewrites those to `:8787` and `:7432`. A direct browser call to `http://127.0.0.1:8787` fails CORS (`Failed to fetch`); the proxy is the supported live path. CI leaves the env vars unset (demo MSW) and also runs Playwright against an in-process mock behind the same `/mkt` proxy — no secrets.
+
+Default market `npm start` is MemoryWallet (no `WALLET_ADAPTER=cdp`). The buyer page `POST /wallets/agent` + funds test USDC and enables **Pay with test signature**. If `/health` reports CDP or a live facilitator, that button stays off.
 
 Buyer flow in the UI:
 
-1. Catalog = `GET /listings`.
+1. Catalog = `GET /listings`. **New listing (Sepolia USDC)** posts an HTTP SKU on `eip155:84532`. Stored mainnet rows are not rewritten.
 2. Invoke unpaid = `GET /listings/:id/invoke` without `PAYMENT-SIGNATURE` → **402**.
-3. Demo pay encodes a v2 payload whose signature is `test:<walletId>` (market `TestFacilitator`). A live Sepolia pay is **not** this UI; use the market's `npm run sepolia-loop`.
-4. 200 body: receipt (90% seller / 10% protocol **accounting**), and `leaseId` for `desktop.linux`.
-5. If Berthos answers `GET /v1/leases/{id}/view`, the UI links `viewer_url` and tells you to run `berth view` on the node host. That URL is loopback guest Xvfb, not the operator desktop.
+3. MemoryWallet / demo pay encodes a v2 payload whose signature is `test:<walletId>` (market `TestFacilitator`). A live Sepolia pay is **not** this UI; use the market's `npm run sepolia-loop`.
+4. 200 body: receipt. **90/10 is receipt accounting.** `onChainSettlement=payTo_100` means on-chain USDC went 100% to `payTo` — not a Base split. `cdp_split_90_10` is the only on-chain 90/10. `leaseId` for `desktop.linux`.
+5. Guest view needs a rebuilt `berthos-linux-desktop:v1` image on the node host (`docker build -t berthos-linux-desktop:v1 images/linux-desktop` in hexuria/berthos). Then `GET /v1/leases/{id}/view` can return `viewer_url`; run `berth view` there. That URL is loopback guest Xvfb, not the operator desktop.
 6. **End lease** = `POST /receipts/:id/end`. Occupancy seconds, `chargedHere: false`. Not a second x402.
 
 Unreachable node, red doctor, `class=laptop`, or 409 already-leased → market 4xx and **no charge**. This UI surfaces that error.
@@ -137,9 +139,11 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 
 ### Live market + optional node
 
-- [ ] Market `npm start` on `:8787`
+- [ ] Market `npm start` on `:8787` (MemoryWallet default)
 - [ ] `VITE_MARKET_URL=http://127.0.0.1:8787` (Vite proxies `/mkt`; do not fetch :8787 from the page)
 - [ ] Optional: berthos `berth node up` + `VITE_BERTHOS_URL=http://127.0.0.1:7432` (proxied as `/bos`)
+- [ ] Rebuild `berthos-linux-desktop:v1` on the node host before expecting `berth view`
+- [ ] Buyer creates/funds a test agent; **Pay with test signature** completes 402 → 200
 - [ ] Confirm the catalog loads without `Failed to fetch` / CORS errors
 - [ ] Confirm host desktop / laptop cannot be listed
 

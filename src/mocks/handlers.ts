@@ -1,11 +1,11 @@
 import { http, HttpResponse } from "msw";
-import { DEMO_BERTHOS_URL, DEMO_MARKET_URL, DEMO_WALLET_ID } from "../lib/config";
+import { DEMO_BERTHOS_URL, DEMO_MARKET_URL } from "../lib/config";
+import { withListingNetworkDefault } from "../lib/listing-defaults";
 import { decideListing } from "../lib/listing-guard";
 import type { Listing, PaymentPayload, PaymentRequired, Receipt, Wallet } from "../lib/types";
 import { BASE_SEPOLIA_CAIP2 } from "../lib/types";
 import { decodeX402Header, encodeX402Header, PAYMENT_REQUIRED_HEADER, PAYMENT_SIGNATURE_HEADER } from "../lib/x402";
 import {
-  DEMO_AGENT_ADDRESS,
   DEMO_DESKTOP_LISTING_ID,
   DEMO_LEASE_ID,
   DEMO_PROTOCOL_ADDRESS,
@@ -18,20 +18,29 @@ import {
 
 interface MarketState {
   listings: Listing[];
-  wallet: Wallet;
+  wallets: Map<string, Wallet>;
   receipts: Map<string, Receipt>;
   nonces: Set<string>;
   leaseSeq: number;
 }
 
 function createState(): MarketState {
+  const wallet = seedWallet();
   return {
     listings: seedListings(),
-    wallet: seedWallet(),
+    wallets: new Map([[wallet.id, wallet]]),
     receipts: new Map(),
     nonces: new Set(),
     leaseSeq: 0,
   };
+}
+
+function nextWalletId(): string {
+  return `wal_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
+}
+
+function nextAddress(): string {
+  return `0x${crypto.randomUUID().replaceAll("-", "").slice(0, 40).padEnd(40, "a")}`;
 }
 
 let state = createState();
@@ -78,6 +87,7 @@ export const handlers = [
       stagingNetwork: BASE_SEPOLIA_CAIP2,
       protocolCutBps: 1000,
       demo: true,
+      walletAdapter: "memory",
     }),
   ),
 
@@ -101,11 +111,7 @@ export const handlers = [
       ...input,
       id: `lst_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`,
       createdAt: new Date().toISOString(),
-      price: {
-        amount: input.price.amount,
-        asset: "USDC",
-        network: input.price.network || BASE_SEPOLIA_CAIP2,
-      },
+      price: withListingNetworkDefault(input.price),
     };
     state.listings.push(listing);
     return HttpResponse.json({ listing }, { status: 201 });
@@ -137,7 +143,8 @@ export const handlers = [
       return paymentRequired(listing, request.url, "unsupported_signature");
     }
     const walletId = payload.payload.signature.slice("test:".length);
-    if (walletId !== state.wallet.id) {
+    const payer = state.wallets.get(walletId);
+    if (!payer) {
       return paymentRequired(listing, request.url, "unknown_wallet");
     }
     if (payload.accepted.amount !== listing.price.amount) {
@@ -156,8 +163,8 @@ export const handlers = [
     const receipt: Receipt = {
       id: `rct_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`,
       listingId: listing.id,
-      payerWalletId: DEMO_WALLET_ID,
-      payerAddress: DEMO_AGENT_ADDRESS,
+      payerWalletId: payer.id,
+      payerAddress: payer.address,
       sellerAddress: listing.payTo,
       protocolAddress: DEMO_PROTOCOL_ADDRESS,
       amountAtomic: listing.price.amount,
@@ -201,11 +208,80 @@ export const handlers = [
     });
   }),
 
-  http.get(`${DEMO_MARKET_URL}/wallets/:id`, ({ params }) => {
-    if (params.id !== state.wallet.id) {
+  http.post(`${DEMO_MARKET_URL}/wallets/treasury`, async ({ request }) => {
+    const body = ((await request.json().catch(() => ({}))) as { label?: string }) ?? {};
+    const wallet: Wallet = {
+      id: nextWalletId(),
+      kind: "treasury",
+      label: body.label,
+      address: nextAddress(),
+      spendCapAtomic: "0",
+      spentAtomic: "0",
+      balanceAtomic: "0",
+      createdAt: new Date().toISOString(),
+    };
+    state.wallets.set(wallet.id, wallet);
+    return HttpResponse.json({ wallet }, { status: 201 });
+  }),
+
+  http.post(`${DEMO_MARKET_URL}/wallets/agent`, async ({ request }) => {
+    const body = (await request.json()) as { spendCap?: string; label?: string; treasuryId?: string };
+    if (!body.spendCap || !/^\d+$/.test(body.spendCap)) {
+      return HttpResponse.json({ error: { code: "invalid_agent", message: "spendCap must be atomic USDC" } }, { status: 400 });
+    }
+    let treasuryId = body.treasuryId;
+    if (!treasuryId) {
+      const treasury: Wallet = {
+        id: nextWalletId(),
+        kind: "treasury",
+        label: "agent-parent",
+        address: nextAddress(),
+        spendCapAtomic: "0",
+        spentAtomic: "0",
+        balanceAtomic: "0",
+        createdAt: new Date().toISOString(),
+      };
+      state.wallets.set(treasury.id, treasury);
+      treasuryId = treasury.id;
+    }
+    const wallet: Wallet = {
+      id: nextWalletId(),
+      kind: "agent",
+      label: body.label,
+      address: nextAddress(),
+      parentId: treasuryId,
+      spendCapAtomic: body.spendCap,
+      spentAtomic: "0",
+      balanceAtomic: "0",
+      createdAt: new Date().toISOString(),
+    };
+    state.wallets.set(wallet.id, wallet);
+    return HttpResponse.json({ wallet }, { status: 201 });
+  }),
+
+  http.post(`${DEMO_MARKET_URL}/wallets/:id/fund`, async ({ request, params }) => {
+    const wallet = state.wallets.get(String(params.id));
+    if (!wallet) {
       return HttpResponse.json({ error: { code: "not_found", message: "wallet not found" } }, { status: 404 });
     }
-    return HttpResponse.json({ wallet: state.wallet });
+    const body = (await request.json()) as { amount?: string };
+    if (!body.amount || !/^\d+$/.test(body.amount)) {
+      return HttpResponse.json({ error: { code: "invalid_amount", message: "amount must be atomic USDC" } }, { status: 400 });
+    }
+    const updated: Wallet = {
+      ...wallet,
+      balanceAtomic: (BigInt(wallet.balanceAtomic) + BigInt(body.amount)).toString(),
+    };
+    state.wallets.set(updated.id, updated);
+    return HttpResponse.json({ wallet: updated });
+  }),
+
+  http.get(`${DEMO_MARKET_URL}/wallets/:id`, ({ params }) => {
+    const wallet = state.wallets.get(String(params.id));
+    if (!wallet) {
+      return HttpResponse.json({ error: { code: "not_found", message: "wallet not found" } }, { status: 404 });
+    }
+    return HttpResponse.json({ wallet });
   }),
 
   http.get(`${DEMO_MARKET_URL}/receipts/:id`, ({ params }) => {

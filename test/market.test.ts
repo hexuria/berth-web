@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fetchViewUrl } from "../src/lib/berthos";
 import { decideListing } from "../src/lib/listing-guard";
-import { createListing, fetchCatalog, fetchWallet, invokeListing } from "../src/lib/market";
+import { createAgent, createListing, fetchCatalog, fetchWallet, fundWallet, invokeListing } from "../src/lib/market";
+import { newHttpListingInput } from "../src/lib/listing-defaults";
 import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
   DEMO_DESKTOP_LISTING_ID,
@@ -49,6 +50,28 @@ describe("mocked market integration", () => {
     const view = await fetchViewUrl(DEMO_LEASE_ID);
     expect(view?.viewer_url).toBe(DEMO_VIEW_URL);
     expect(view?.target).toBe("guest");
+  });
+
+  it("POST /wallets/agent + fund then test:<walletId> settles 402→200", async () => {
+    const agent = await createAgent({ spendCap: "5000000", label: "berth-web-buyer" });
+    const funded = await fundWallet(agent.id, "2000000");
+    expect(funded.balanceAtomic).toBe("2000000");
+    const unpaid = await invokeListing(DEMO_HTTP_LISTING_ID);
+    const paid = await invokeListing(DEMO_HTTP_LISTING_ID, encodeDemoPaymentSignature(unpaid.quote!, funded));
+    expect(paid.status).toBe(200);
+    expect(paid.receipt?.payerWalletId).toBe(funded.id);
+  });
+
+  it("new listing helper defaults to Sepolia and does not rewrite mainnet", async () => {
+    const sepolia = await createListing(newHttpListingInput({ title: "fresh.sepolia" }));
+    expect(sepolia.ok).toBe(true);
+    if (sepolia.ok) expect(sepolia.listing.price.network).toBe(BASE_SEPOLIA_CAIP2);
+
+    const mainnet = await createListing({
+      ...newHttpListingInput({ title: "kept.mainnet", network: "eip155:8453" }),
+    });
+    expect(mainnet.ok).toBe(true);
+    if (mainnet.ok) expect(mainnet.listing.price.network).toBe("eip155:8453");
   });
 
   it("POST laptop listing is rejected with forbidden_class", async () => {

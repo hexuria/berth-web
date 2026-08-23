@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { fetchViewUrl } from "../lib/berthos";
-import { DEMO_WALLET_ID, isDemoMode } from "../lib/config";
+import { isDemoMode } from "../lib/config";
 import { decideListing } from "../lib/listing-guard";
-import { endReceipt, fetchCatalog, fetchWallet, invokeListing } from "../lib/market";
+import { newHttpListingInput } from "../lib/listing-defaults";
+import { createListing, endReceipt, fetchCatalog, invokeListing } from "../lib/market";
+import { resolvePayMode } from "../lib/pay-mode";
 import { encodeDemoPaymentSignature, formatUsdcAtomic } from "../lib/payment";
+import { describeReceiptSplit } from "../lib/receipt-split";
 import type { Listing, PaymentRequired, Receipt, ViewUrl, Wallet } from "../lib/types";
 
 interface QuoteState {
@@ -22,18 +25,32 @@ export function BuyerPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loadError, setLoadError] = useState<string | undefined>();
   const [wallet, setWallet] = useState<Wallet | undefined>();
+  const [payBlocked, setPayBlocked] = useState<string | undefined>();
+  const [paySource, setPaySource] = useState<"demo" | "memory" | undefined>();
   const [quote, setQuote] = useState<QuoteState | undefined>();
   const [paid, setPaid] = useState<PaidState | undefined>();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | undefined>();
+  const demo = isDemoMode();
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchCatalog(), isDemoMode() ? fetchWallet(DEMO_WALLET_ID).catch(() => undefined) : Promise.resolve(undefined)])
-      .then(([rows, demoWallet]) => {
+    void Promise.all([
+      fetchCatalog(),
+      resolvePayMode(demo).catch((error: unknown) => ({
+        kind: "disabled" as const,
+        reason: error instanceof Error ? error.message : "wallet setup failed",
+      })),
+    ])
+      .then(([rows, pay]) => {
         if (cancelled) return;
         setListings(rows);
-        setWallet(demoWallet);
+        if (pay.kind === "test-signature") {
+          setWallet(pay.wallet);
+          setPaySource(pay.source);
+        } else {
+          setPayBlocked(pay.reason);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) setLoadError(error instanceof Error ? error.message : "catalog failed");
@@ -41,7 +58,7 @@ export function BuyerPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [demo]);
 
   async function onInvoke(listing: Listing) {
     setActionError(undefined);
@@ -63,7 +80,10 @@ export function BuyerPage() {
     if (!quote) return;
     const payer = wallet;
     if (!payer) {
-      setActionError("Demo wallet missing. Demo mode funds test:<walletId> against the in-memory market.");
+      setActionError(
+        payBlocked ??
+          "No test agent. Live MemoryWallet markets create one via POST /wallets/agent; CDP / live facilitator disables test signatures.",
+      );
       return;
     }
     setBusy(true);
@@ -98,6 +118,24 @@ export function BuyerPage() {
     }
   }
 
+  async function onNewListing() {
+    setActionError(undefined);
+    setBusy(true);
+    try {
+      const result = await createListing(newHttpListingInput());
+      if (!result.ok) {
+        setActionError(result.error.message);
+        return;
+      }
+      setListings((rows) => [...rows, result.listing]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const receiptSplit = paid ? describeReceiptSplit(paid.receipt) : undefined;
+  const canPay = Boolean(wallet) && !payBlocked;
+
   return (
     <main>
       <section>
@@ -106,8 +144,21 @@ export function BuyerPage() {
           Listings come from berth-market <code>GET /listings</code>. Prices are atomic USDC on{" "}
           <strong>Base Sepolia</strong> (<code>eip155:84532</code>). Mainnet is off in this UI. Laptop / host-desktop
           rows are refused here the same way the market API rejects them.
+          Stored listings keep their own network — this UI does not rewrite mainnet rows to Sepolia.
         </p>
+        {!demo && paySource === "memory" && (
+          <div className="actions">
+            <button type="button" className="secondary" disabled={busy} onClick={() => void onNewListing()} data-testid="new-listing">
+              New listing (Sepolia USDC)
+            </button>
+          </div>
+        )}
         {loadError && <p>{loadError}</p>}
+        {payBlocked && !quote && (
+          <p className="meta" data-testid="pay-blocked">
+            {payBlocked}
+          </p>
+        )}
         <div className="grid catalog" data-testid="catalog">
           {listings.map((listing) => {
             const decision = decideListing(listing);
@@ -160,9 +211,18 @@ export function BuyerPage() {
             <span className="pill quote">HTTP 402</span> Payment required
           </h2>
           <p>
-            Unpaid <code>GET /listings/{quote.listing.id}/invoke</code> returned an x402 v2 quote. Demo pay uses{" "}
-            <code>test:{wallet?.id ?? "walletId"}</code> against the in-memory market — no keys, no chain.
+            Unpaid <code>GET /listings/{quote.listing.id}/invoke</code> returned an x402 v2 quote.{" "}
+            {paySource === "memory"
+              ? "This market is MemoryWallet (no WALLET_ADAPTER=cdp). Pay sends test:"
+              : "Demo pay uses test:"}
+            <code>{wallet?.id ?? "walletId"}</code>
+            {paySource === "memory" ? " against the local TestFacilitator — no keys, no chain." : " against the in-memory market — no keys, no chain."}
           </p>
+          {payBlocked && (
+            <p className="meta" data-testid="pay-blocked">
+              {payBlocked}
+            </p>
+          )}
           <dl className="facts">
             <dt>listing</dt>
             <dd>{quote.listing.title}</dd>
@@ -177,7 +237,7 @@ export function BuyerPage() {
           </dl>
           <pre className="quote">{JSON.stringify(quote.quote, null, 2)}</pre>
           <div className="actions">
-            <button type="button" disabled={busy || !wallet} onClick={() => void onPay()} data-testid="pay-demo">
+            <button type="button" disabled={busy || !canPay} onClick={() => void onPay()} data-testid="pay-demo">
               Pay with test signature
             </button>
           </div>
@@ -193,9 +253,9 @@ export function BuyerPage() {
             <dt>transaction</dt>
             <dd className="mono">{paid.receipt.transaction}</dd>
             <dt>split</dt>
-            <dd>
-              seller {formatUsdcAtomic(paid.receipt.sellerAtomic)} (90%) · protocol{" "}
-              {formatUsdcAtomic(paid.receipt.protocolAtomic)} (10%) — receipt accounting
+            <dd data-testid="receipt-split">
+              {receiptSplit?.headline}
+              {receiptSplit?.detail && <p className="meta">{receiptSplit.detail}</p>}
             </dd>
             {paid.leaseId && (
               <>
