@@ -1,4 +1,5 @@
-import { createServer as createHttpServer, type AddressInfo } from "node:http";
+import { createServer as createHttpServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { createServer as createViteServer } from "vite";
 import { describe, expect, it } from "vitest";
 import {
