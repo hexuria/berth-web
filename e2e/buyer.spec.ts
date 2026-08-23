@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("buyer catalog and 402 → receipt", () => {
+  test("CI default is demo MSW (no live market, no CORS proxy needed)", async ({ page }) => {
+    await page.goto("/#/buyer");
+    await expect(page.getByTestId("mode-banner")).toContainText("Demo mode");
+  });
+
   test("buyer sees catalog, unpaid invoke shows 402, demo pay shows receipt", async ({ page }) => {
     await page.goto("/#/buyer");
     const catalog = page.getByTestId("catalog");

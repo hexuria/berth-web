@@ -30,7 +30,7 @@ npm run dev          # http://127.0.0.1:5173  (demo market via MSW)
 
 Default **demo mode** talks to an in-memory market (MSW). `npm test` and Playwright need no network and no secrets.
 
-Optional live market:
+Optional live market (same-origin Vite proxy — do not fetch :8787 from the page):
 
 ```bash
 # other terminal: hexuria/berth-market
@@ -40,10 +40,17 @@ npm start            # http://127.0.0.1:8787
 export VITE_MARKET_URL=http://127.0.0.1:8787
 # optional loopback node (same role as BERTHOS_URL on the market)
 export VITE_BERTHOS_URL=http://127.0.0.1:7432
-npm run dev
+npm run dev          # browser uses /mkt → :8787 and /bos → :7432
 ```
 
-Do not set CDP keys, wallet secrets, or `NETWORK=eip155:8453` here.
+berth-market does not send CORS headers, so `VITE_MARKET_URL=http://127.0.0.1:8787` as a **browser** fetch target fails (`Failed to fetch`). The default Vite config reads those env vars and proxies:
+
+| Browser path | Upstream (env) |
+| --- | --- |
+| `/mkt` | `VITE_MARKET_URL` (e.g. `http://127.0.0.1:8787`) |
+| `/bos` | `VITE_BERTHOS_URL` (e.g. `http://127.0.0.1:7432`) |
+
+Leave both unset for demo MSW (CI default). Restart `npm run dev` after changing env. Do not set CDP keys, wallet secrets, or `NETWORK=eip155:8453` here.
 
 ## Scripts
 

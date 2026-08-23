@@ -92,7 +92,7 @@ export function HostPage() {
         <p className="meta">
           {isDemoMode()
             ? "Demo mode mocks GET /v1/eligibility so CI can run without a node."
-            : "Read from VITE_BERTHOS_URL when a live Berthos node is listening on loopback."}
+            : "Read same-origin /bos (Vite proxy of VITE_BERTHOS_URL) when a live Berthos node is listening on loopback."}
         </p>
         {eligibility.status === "loading" && <p>Checking node…</p>}
         {eligibility.status === "missing" && <p className="status-line">{eligibility.message}</p>}
