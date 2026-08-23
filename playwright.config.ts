@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 4173;
-const baseURL = `http://127.0.0.1:${port}`;
+const demoURL = "http://127.0.0.1:4173";
+const liveURL = "http://127.0.0.1:4174";
+const mockMarket = "http://127.0.0.1:18787";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -13,21 +14,40 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
-    baseURL,
     trace: "off",
     video: "off",
     screenshot: "off",
   },
-  webServer: {
-    command: `npm run build && npx vite preview --host 127.0.0.1 --port ${port} --strictPort`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "node e2e/mock-live-market.mjs",
+      url: `${mockMarket}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      command: `npm run build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort`,
+      url: demoURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: `VITE_MARKET_URL=${mockMarket} npx vite --host 127.0.0.1 --port 4174 --strictPort`,
+      url: liveURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /live-proxy\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: demoURL },
+    },
+    {
+      name: "live-proxy",
+      testMatch: /live-proxy\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: liveURL },
     },
   ],
 });

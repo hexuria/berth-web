@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { fetchEligibility } from "../lib/berthos";
 import { isDemoMode } from "../lib/config";
+import { defaultListingPrice } from "../lib/listing-defaults";
 import { decideListing, forbiddenKindMessage } from "../lib/listing-guard";
 import { createListing } from "../lib/market";
 import type { EligibilityAttestation, MarketError } from "../lib/types";
-import { BASE_SEPOLIA_CAIP2 } from "../lib/types";
 
 const PARK_COMMANDS = `# In hexuria/berthos — this UI does not run Docker or start a guest.
 cargo install --path crates/berthos-cli   # command name is \`berth\`
@@ -59,7 +59,7 @@ export function HostPage() {
     const result = await createListing({
       kind: LAPTOP_KIND,
       title: "daily-driver.laptop",
-      price: { amount: "1000", asset: "USDC", network: BASE_SEPOLIA_CAIP2 },
+      price: defaultListingPrice(),
       payTo: "0x1111111111111111111111111111111111111111",
       class: "laptop",
     });
