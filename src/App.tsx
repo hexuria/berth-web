@@ -34,7 +34,7 @@ export function App() {
           </a>
         </nav>
       </header>
-      <div className="banner">
+      <div className="banner" data-testid="mode-banner">
         <strong>{isDemoMode() ? "Demo mode" : "Live market"}</strong>
         {" — "}
         payments settle in <a href="https://github.com/hexuria/berth-market">berth-market</a>

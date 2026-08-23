@@ -79,7 +79,7 @@ export VITE_BERTHOS_URL=http://127.0.0.1:7432
 npm run dev
 ```
 
-If the node is down, the host page says so. It will not pretend Docker started.
+The host page reads same-origin `/bos/v1/eligibility` (Vite → `:7432`). If the node is down, the page says so. It will not pretend Docker started.
 
 ---
 
@@ -106,6 +106,8 @@ export VITE_MARKET_URL=http://127.0.0.1:8787
 # export VITE_BERTHOS_URL=http://127.0.0.1:7432
 npm run dev
 ```
+
+The page stays on `http://127.0.0.1:5173`. It fetches **same origin** `/mkt/*` and `/bos/*`. Vite rewrites those to `:8787` and `:7432`. A direct browser call to `http://127.0.0.1:8787` fails CORS (`Failed to fetch`); the proxy is the supported live path. CI leaves the env vars unset and keeps MSW.
 
 Buyer flow in the UI:
 
@@ -136,8 +138,9 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 ### Live market + optional node
 
 - [ ] Market `npm start` on `:8787`
-- [ ] `VITE_MARKET_URL=http://127.0.0.1:8787`
-- [ ] Optional: berthos `berth node up` + `VITE_BERTHOS_URL=http://127.0.0.1:7432`
+- [ ] `VITE_MARKET_URL=http://127.0.0.1:8787` (Vite proxies `/mkt`; do not fetch :8787 from the page)
+- [ ] Optional: berthos `berth node up` + `VITE_BERTHOS_URL=http://127.0.0.1:7432` (proxied as `/bos`)
+- [ ] Confirm the catalog loads without `Failed to fetch` / CORS errors
 - [ ] Confirm host desktop / laptop cannot be listed
 
 ### Do not
