@@ -32,7 +32,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `VITE_MARKET_URL=${mockMarket} npx vite --host 127.0.0.1 --port 4174 --strictPort`,
+      command: `VITE_MARKET_URL=${mockMarket} VITE_BERTHOS_URL=${mockMarket} npx vite --host 127.0.0.1 --port 4174 --strictPort`,
       url: liveURL,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

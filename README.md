@@ -67,7 +67,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | --- | --- |
 | `npm run lint` | ESLint + `tsc --noEmit` |
 | `npm test` | Vitest unit + MSW integration |
-| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` proxy against an in-process mock |
+| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + `desktop.linux`, no Docker) |
 | `npm run build` | Production bundle |
 
 ## Talks to

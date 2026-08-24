@@ -1,6 +1,7 @@
 /**
  * In-process MemoryWallet stand-in for Playwright live-proxy e2e.
- * Vite proxies /mkt → this process. No secrets, no Docker, no real berth-market.
+ * Vite proxies /mkt (market) and /bos (lease view) → this process.
+ * No secrets, no Docker, no real berth-market, no real Berthos, no wallets on /v1.
  */
 import { createServer } from "node:http";
 
@@ -12,8 +13,23 @@ const USDC_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const SELLER = "0x1111111111111111111111111111111111111111";
 const PROTOCOL = "0x2222222222222222222222222222222222222222";
+const LOOPBACK_VIEW = "http://127.0.0.1:17900/?token=live-lease-bearer";
+const SELF = `http://${HOST}:${PORT}`;
+
+const FORBIDDEN_KINDS = new Set([
+  "laptop",
+  "host-desktop",
+  "host_desktop",
+  "hostdesktop",
+  "desktop.laptop",
+  "desktop.host",
+  "desktop.host-desktop",
+]);
+const FORBIDDEN_CLASSES = new Set(["laptop", "host-desktop", "host_desktop", "hostdesktop"]);
+const LISTING_KINDS = new Set(["http", "mcp", "desktop.linux"]);
 
 const wallets = new Map();
+const receipts = new Map();
 const listings = [
   {
     id: "lst_weather",
@@ -34,8 +50,45 @@ const listings = [
     payTo: SELLER,
     createdAt: "2026-08-23T07:00:00.000Z",
   },
+  {
+    id: "lst_gpu",
+    kind: "desktop.linux",
+    title: "gpu-box.session",
+    description: "Live-proxy mock isolated Linux guest (no real Berthos)",
+    price: { amount: "1000", asset: "USDC", network: SEPOLIA },
+    payTo: SELLER,
+    class: "vm-guest",
+    fulfillment: { berthosUrl: SELF, sku: "linux-gpu-1", nodeId: "node_live_mock" },
+    eligibility: {
+      protocol: "v1",
+      source: "berthos.doctor",
+      ok: true,
+      eligible: true,
+      class: "vm-guest",
+      attestedAt: "2026-08-23T07:00:00.000Z",
+      timestamp: "2026-08-23T07:00:00.000Z",
+      berthosUrl: SELF,
+      nodeId: "node_live_mock",
+      checks: [
+        { id: "class", status: "pass", detail: "class=vm-guest (isolated guest, not the host desktop)" },
+      ],
+    },
+    createdAt: "2026-08-23T07:00:00.000Z",
+  },
+  {
+    // Seeded so the buyer UI can refuse it the same way the market API does.
+    id: "lst_laptop",
+    kind: "laptop",
+    title: "daily-driver.laptop",
+    description: "Must never be offered as a public listing",
+    price: { amount: "1000", asset: "USDC", network: SEPOLIA },
+    payTo: SELLER,
+    class: "laptop",
+    createdAt: "2026-08-23T07:00:00.000Z",
+  },
 ];
 const nonces = new Set();
+let leaseSeq = 0;
 
 function json(res, status, body) {
   res.writeHead(status, { "content-type": "application/json" });
@@ -80,6 +133,47 @@ function header(req, name) {
 
 function decodePayment(headerValue) {
   return JSON.parse(Buffer.from(headerValue, "base64").toString("utf8"));
+}
+
+function decideListing(input) {
+  const kind = typeof input.kind === "string" ? input.kind.trim() : "";
+  if (kind && FORBIDDEN_KINDS.has(kind)) {
+    return {
+      ok: false,
+      code: "forbidden_class",
+      message: `listings that claim kind=${kind} are rejected — only VM/server guests, never a laptop or host desktop`,
+    };
+  }
+  if (kind && !LISTING_KINDS.has(kind)) {
+    return {
+      ok: false,
+      code: "unsupported_kind",
+      message: `unsupported listing kind "${kind}". v1 kinds: http, mcp, desktop.linux`,
+    };
+  }
+  if (input.class && FORBIDDEN_CLASSES.has(input.class)) {
+    return {
+      ok: false,
+      code: "forbidden_class",
+      message: `class=${input.class} is forbidden. Hard rule: only VM/server guests, never a laptop or host desktop`,
+    };
+  }
+  const eligibilityClass = input.eligibility?.class;
+  if (eligibilityClass && FORBIDDEN_CLASSES.has(eligibilityClass)) {
+    return {
+      ok: false,
+      code: "forbidden_class",
+      message: `eligibility.class=${eligibilityClass} is forbidden. Hard rule: only VM/server guests, never a laptop or host desktop`,
+    };
+  }
+  if (kind.startsWith("desktop.") && input.eligibility && input.eligibility.ok === false) {
+    return {
+      ok: false,
+      code: "eligibility_failed",
+      message: "desktop listings fail closed when the stored doctor attestation is not ok",
+    };
+  }
+  return { ok: true };
 }
 
 function quoteFor(listing, url) {
@@ -128,6 +222,11 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/listings") {
       const input = await readBody(req);
+      const decision = decideListing(input);
+      if (!decision.ok) {
+        json(res, 400, { error: { code: decision.code, message: decision.message } });
+        return;
+      }
       const network = typeof input.price?.network === "string" && input.price.network.trim()
         ? input.price.network.trim()
         : SEPOLIA;
@@ -138,7 +237,10 @@ const server = createServer(async (req, res) => {
         description: input.description,
         price: { amount: input.price?.amount ?? "1000", asset: "USDC", network },
         payTo: input.payTo ?? SELLER,
+        class: input.class,
         endpoint: input.endpoint,
+        fulfillment: input.fulfillment,
+        eligibility: input.eligibility,
         createdAt: new Date().toISOString(),
       };
       listings.push(listing);
@@ -151,6 +253,11 @@ const server = createServer(async (req, res) => {
       const listing = listings.find((row) => row.id === invoke[1]);
       if (!listing) {
         json(res, 404, { error: { code: "not_found", message: "listing not found" } });
+        return;
+      }
+      const leaked = decideListing(listing);
+      if (!leaked.ok) {
+        json(res, 400, { error: { code: leaked.code, message: leaked.message } });
         return;
       }
       const signature = header(req, "PAYMENT-SIGNATURE");
@@ -195,10 +302,29 @@ const server = createServer(async (req, res) => {
         createdAt: new Date().toISOString(),
         onChainSettlement: "payTo_100",
       };
+      let fulfillment = { status: "accepted" };
+      if (listing.kind === "desktop.linux") {
+        leaseSeq += 1;
+        const leaseId = leaseSeq === 1 ? "l_live_lease" : `l_live_${leaseSeq}`;
+        receipt.leaseId = leaseId;
+        receipt.berthosUrl = SELF;
+        receipt.leaseState = "live";
+        receipt.occupancyUnit = "seconds";
+        fulfillment = {
+          status: "leased",
+          leaseId,
+          berthosUrl: SELF,
+          os: "linux",
+          state: "live",
+          occupancyUnit: "seconds",
+          note: "Isolated Linux guest is live. End the lease to store occupancy seconds; they are not a second charge.",
+        };
+      }
+      receipts.set(receipt.id, receipt);
       json(res, 200, {
         ok: true,
         listing: { id: listing.id, kind: listing.kind, title: listing.title },
-        fulfillment: { status: "accepted" },
+        fulfillment,
         receipt,
       });
       return;
@@ -275,6 +401,98 @@ const server = createServer(async (req, res) => {
         return;
       }
       json(res, 200, { wallet });
+      return;
+    }
+
+    const getReceipt = path.match(/^\/receipts\/([^/]+)$/);
+    if (req.method === "GET" && getReceipt) {
+      const receipt = receipts.get(getReceipt[1]);
+      if (!receipt) {
+        json(res, 404, { error: { code: "not_found", message: "receipt not found" } });
+        return;
+      }
+      json(res, 200, { receipt });
+      return;
+    }
+
+    const endReceipt = path.match(/^\/receipts\/([^/]+)\/end$/);
+    if (req.method === "POST" && endReceipt) {
+      const receipt = receipts.get(endReceipt[1]);
+      if (!receipt) {
+        json(res, 404, { error: { code: "not_found", message: "receipt not found" } });
+        return;
+      }
+      if (!receipt.leaseId) {
+        json(res, 400, { error: { code: "no_lease", message: "receipt has no Berthos lease to end" } });
+        return;
+      }
+      if (receipt.leaseState === "ended") {
+        json(res, 200, {
+          ok: true,
+          receipt,
+          occupancy: {
+            seconds: receipt.occupancySeconds ?? 60,
+            billedSeconds: receipt.billedSeconds ?? 60,
+            unit: "seconds",
+            chargedHere: false,
+            note: "lease already ended; occupancy is a receipt, not a second charge",
+          },
+        });
+        return;
+      }
+      const updated = {
+        ...receipt,
+        leaseState: "ended",
+        occupancySeconds: 60,
+        billedSeconds: 60,
+        occupancyUnit: "seconds",
+      };
+      receipts.set(updated.id, updated);
+      json(res, 200, {
+        ok: true,
+        receipt: updated,
+        occupancy: {
+          seconds: 60,
+          billedSeconds: 60,
+          minSeconds: 60,
+          unit: "seconds",
+          chargedHere: false,
+          note: "v1 is pay-then-occupy. Occupancy seconds are a receipt, not a second x402 charge.",
+        },
+      });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/v1/eligibility") {
+      json(res, 200, {
+        protocol: "v1",
+        source: "berthos.doctor",
+        ok: true,
+        eligible: true,
+        class: "vm-guest",
+        attestedAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+        berthosUrl: SELF,
+        nodeId: "node_live_mock",
+        checks: [
+          { id: "class", status: "pass", detail: "class=vm-guest (isolated guest, not the host desktop)" },
+          { id: "runtime", status: "pass", detail: "mocked — this process is not Docker or a real node" },
+        ],
+      });
+      return;
+    }
+
+    const view = path.match(/^\/v1\/leases\/([^/]+)\/view$/);
+    if (req.method === "GET" && view) {
+      if (!String(view[1]).startsWith("l_")) {
+        json(res, 404, { error: { code: "not_found", message: "lease not found" } });
+        return;
+      }
+      json(res, 200, {
+        viewer_url: LOOPBACK_VIEW,
+        target: "guest",
+        token: "live-lease-bearer",
+      });
       return;
     }
 
