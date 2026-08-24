@@ -107,7 +107,7 @@ export VITE_MARKET_URL=http://127.0.0.1:8787
 npm run dev
 ```
 
-**Live = `VITE_MARKET_URL` + the Vite proxy.** The page stays on `http://127.0.0.1:5173`. It fetches **same origin** `/mkt/*` and `/bos/*`. Vite rewrites those to `:8787` and `:7432`. A direct browser call to `http://127.0.0.1:8787` fails CORS (`Failed to fetch`); the proxy is the supported live path. CI leaves the env vars unset (demo MSW) and also runs Playwright against an in-process mock behind the same `/mkt` proxy — no secrets.
+**Live = `VITE_MARKET_URL` + the Vite proxy.** The page stays on `http://127.0.0.1:5173`. It fetches **same origin** `/mkt/*` and `/bos/*`. Vite rewrites those to `:8787` and `:7432`. A direct browser call to `http://127.0.0.1:8787` fails CORS (`Failed to fetch`); the proxy is the supported live path. CI leaves the env vars unset (demo MSW) and also runs Playwright against an in-process mock behind the same `/mkt` + `/bos` proxies — HTTP `weather.now` and paid `desktop.linux` (occupancy + loopback `berth view` URL), no secrets, no Docker, no real Berthos.
 
 Default market `npm start` is MemoryWallet (no `WALLET_ADAPTER=cdp`). The buyer page `POST /wallets/agent` + funds test USDC and enables **Pay with test signature**. If `/health` reports CDP or a live facilitator, that button stays off.
 
