@@ -46,6 +46,16 @@ const listings = [
     createdAt: "2026-08-23T07:00:00.000Z",
   },
   {
+    id: "lst_weather_tool",
+    kind: "mcp",
+    title: "weather.tool",
+    description: "Live-proxy mock MCP SKU",
+    price: { amount: "1000", asset: "USDC", network: SEPOLIA },
+    payTo: SELLER,
+    endpoint: { url: "https://mcp.example.com/sse", method: "POST", tool: "weather" },
+    createdAt: "2026-08-23T07:00:00.000Z",
+  },
+  {
     id: "lst_mainnet",
     kind: "http",
     title: "mainnet.stored",

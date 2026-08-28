@@ -7,6 +7,7 @@ import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
   DEMO_DESKTOP_LISTING_ID,
   DEMO_HTTP_LISTING_ID,
+  DEMO_MCP_LISTING_ID,
   DEMO_LAPTOP_LISTING_ID,
   DEMO_LEASE_ID,
   DEMO_VIEW_URL,
@@ -20,7 +21,9 @@ describe("mocked market integration", () => {
     const listings = await fetchCatalog();
     const titles = listings.map((row) => row.title);
     expect(titles).toContain("weather.now");
+    expect(titles).toContain("weather.tool");
     expect(titles).toContain("gpu-box.session");
+    expect(listings.some((row) => row.id === DEMO_MCP_LISTING_ID && row.kind === "mcp")).toBe(true);
     expect(listings.some((row) => row.id === DEMO_LAPTOP_LISTING_ID)).toBe(true);
   });
 
@@ -38,6 +41,30 @@ describe("mocked market integration", () => {
     expect(paid.receipt?.network).toBe(BASE_SEPOLIA_CAIP2);
     expect(paid.receipt?.sellerAtomic).toBe("900");
     expect(paid.receipt?.protocolAtomic).toBe("100");
+    expect(paid.receipt?.leaseId).toBeUndefined();
+    expect(paid.fulfillment?.status).toBe("accepted");
+  });
+
+  it("mcp pay returns 200 without a lease or occupancy", async () => {
+    const unpaid = await invokeListing(DEMO_MCP_LISTING_ID);
+    expect(unpaid.status).toBe(402);
+    expect(unpaid.quote?.x402Version).toBe(2);
+    expect(unpaid.quote?.accepts[0]?.network).toBe(BASE_SEPOLIA_CAIP2);
+    expect(unpaid.error?.code).toBe("payment_required");
+
+    const wallet = await fetchWallet(DEMO_WALLET_ID);
+    const paid = await invokeListing(DEMO_MCP_LISTING_ID, encodeDemoPaymentSignature(unpaid.quote!, wallet));
+    expect(paid.status).toBe(200);
+    expect(paid.listing?.kind).toBe("mcp");
+    expect(paid.receipt?.id).toMatch(/^rct_/);
+    expect(paid.receipt?.network).toBe(BASE_SEPOLIA_CAIP2);
+    expect(paid.receipt?.sellerAtomic).toBe("900");
+    expect(paid.receipt?.protocolAtomic).toBe("100");
+    expect(paid.receipt?.leaseId).toBeUndefined();
+    expect(paid.receipt?.leaseState).toBeUndefined();
+    expect(paid.receipt?.occupancySeconds).toBeUndefined();
+    expect(paid.fulfillment?.status).toBe("accepted");
+    expect(paid.fulfillment?.leaseId).toBeUndefined();
   });
 
   it("desktop pay returns leaseId and a berthos view URL", async () => {

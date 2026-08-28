@@ -7,6 +7,7 @@ export const DEMO_SELLER_ADDRESS = "0x1111111111111111111111111111111111111111";
 export const DEMO_PROTOCOL_ADDRESS = "0x2222222222222222222222222222222222222222";
 
 export const DEMO_HTTP_LISTING_ID = "lst_weather";
+export const DEMO_MCP_LISTING_ID = "lst_weather_tool";
 export const DEMO_DESKTOP_LISTING_ID = "lst_gpu";
 export const DEMO_LAPTOP_LISTING_ID = "lst_laptop";
 export const DEMO_LEASE_ID = "l_demo_lease";
@@ -72,6 +73,16 @@ export function seedListings(): Listing[] {
       price: defaultListingPrice(),
       payTo: DEMO_SELLER_ADDRESS,
       endpoint: { url: "https://api.example.com/weather", method: "GET" },
+      createdAt: "2026-08-23T07:00:00.000Z",
+    },
+    {
+      id: DEMO_MCP_LISTING_ID,
+      kind: "mcp",
+      title: "weather.tool",
+      description: "Current conditions (demo MCP SKU)",
+      price: defaultListingPrice(),
+      payTo: DEMO_SELLER_ADDRESS,
+      endpoint: { url: "https://mcp.example.com/sse", method: "POST", tool: "weather" },
       createdAt: "2026-08-23T07:00:00.000Z",
     },
     {
