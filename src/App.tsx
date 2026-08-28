@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { isDemoMode } from "./lib/config";
+import { fetchHealth } from "./lib/market";
+import { formatHealthIdentity } from "./lib/pay-mode";
+import type { MarketHealth } from "./lib/types";
 import { BuyerPage } from "./pages/BuyerPage";
 import { HostPage } from "./pages/HostPage";
 
@@ -11,12 +14,31 @@ function roleFromHash(): Role {
 
 export function App() {
   const [role, setRole] = useState<Role>(roleFromHash);
+  const [health, setHealth] = useState<MarketHealth | undefined>();
+  const demo = isDemoMode();
 
   useEffect(() => {
     const onHash = () => setRole(roleFromHash());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  useEffect(() => {
+    if (demo) return;
+    let cancelled = false;
+    void fetchHealth()
+      .then((report) => {
+        if (!cancelled) setHealth(report);
+      })
+      .catch(() => {
+        /* banner stays "Live market" without identity */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demo]);
+
+  const identity = health ? formatHealthIdentity(health) : "";
 
   return (
     <>
@@ -35,7 +57,15 @@ export function App() {
         </nav>
       </header>
       <div className="banner" data-testid="mode-banner">
-        <strong>{isDemoMode() ? "Demo mode" : "Live market"}</strong>
+        <strong>{demo ? "Demo mode" : "Live market"}</strong>
+        {identity ? (
+          <>
+            {" — "}
+            <span className="mono" data-testid="health-identity">
+              {identity}
+            </span>
+          </>
+        ) : null}
         {" — "}
         payments settle in <a href="https://github.com/hexuria/berth-market">berth-market</a>
         {"; "}

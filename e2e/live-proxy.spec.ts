@@ -8,6 +8,8 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     });
     await page.goto("/#/buyer");
     await expect(page.getByTestId("mode-banner")).toContainText("Live market");
+    await expect(page.getByTestId("health-identity")).toHaveText("walletAdapter=memory facilitator=test");
+    await expect(page.getByTestId("mode-banner")).not.toContainText("facilitatorUrl");
     const catalogResponse = await listings;
     expect(catalogResponse.ok()).toBe(true);
     await expect(page.getByTestId("listing-weather.now")).toBeVisible();
@@ -72,6 +74,54 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await page.getByRole("button", { name: "End lease" }).click();
     await expect(receipt).toContainText("occupancySeconds=60");
     await expect(receipt).toContainText("not a second charge");
+  });
+
+  test("CDP / live facilitator health disables Pay with test signature", async ({ page }) => {
+    await page.route("**/mkt/health", async (route) => {
+      const url = new URL(route.request().url());
+      url.searchParams.set("walletAdapter", "cdp");
+      url.searchParams.set("facilitator", "live");
+      url.searchParams.set("facilitatorUrl", "https://x402.org/facilitator");
+      const response = await route.fetch({ url: url.toString() });
+      await route.fulfill({ response });
+    });
+
+    await page.goto("/#/buyer");
+    await expect(page.getByTestId("health-identity")).toHaveText("walletAdapter=cdp facilitator=live");
+    await expect(page.getByTestId("mode-banner")).not.toContainText("x402.org");
+    await expect(page.getByTestId("pay-blocked")).toBeVisible();
+    await expect(page.getByTestId("pay-blocked")).toContainText("WALLET_ADAPTER=cdp");
+    await expect(page.getByTestId("pay-blocked")).toContainText("test:");
+
+    await page.getByTestId("listing-weather.now").getByRole("button", { name: "Invoke unpaid" }).click();
+    const quote = page.getByTestId("quote");
+    await expect(quote).toBeVisible();
+    await expect(page.getByTestId("pay-demo")).toBeDisabled();
+    await expect(page.getByTestId("pay-blocked")).toContainText("WALLET_ADAPTER=cdp");
+  });
+
+  test("host /bos eligibility is vm-guest desktop.linux; laptop and host-desktop stay refused", async ({
+    page,
+  }) => {
+    const eligibility = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/bos/v1/eligibility" && response.request().method() === "GET";
+    });
+    await page.goto("/#/host");
+    const eligibilityResponse = await eligibility;
+    expect(eligibilityResponse.ok()).toBe(true);
+
+    await expect(page.getByTestId("eligibility-status")).toHaveText("eligible");
+    await expect(page.getByTestId("eligibility-class")).toContainText("vm-guest");
+    await expect(page.getByTestId("eligibility-kind")).toContainText("desktop.linux");
+
+    await page.getByTestId("try-laptop").click();
+    await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
+    await expect(page.getByTestId("forbidden-class")).toContainText("laptop");
+
+    await page.getByTestId("try-host-desktop").click();
+    await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
+    await expect(page.getByTestId("forbidden-class")).toContainText("host-desktop");
   });
 
   test("laptop listing is refused (forbidden_class) and is not invokable", async ({ page }) => {

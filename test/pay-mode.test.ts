@@ -4,6 +4,7 @@ import { DEMO_MARKET_URL, DEMO_WALLET_ID } from "../src/lib/config";
 import {
   LIVE_WALLET_STORAGE_KEY,
   cdpWalletMessage,
+  formatHealthIdentity,
   liveFacilitatorMessage,
   reportsLiveFacilitator,
   resolvePayMode,
@@ -32,6 +33,18 @@ describe("pay mode (MemoryWallet vs CDP / live facilitator)", () => {
     expect(reportsLiveFacilitator({ ok: true, facilitatorUrl: "https://x402.org/facilitator" })).toBe(true);
     expect(liveFacilitatorMessage({ ok: true, walletAdapter: "cdp" })).toMatch(/WALLET_ADAPTER=cdp/);
     expect(cdpWalletMessage()).toMatch(/CDP wallet/);
+    expect(
+      formatHealthIdentity({
+        ok: true,
+        walletAdapter: "cdp",
+        facilitator: "live",
+        facilitatorUrl: "https://x402.org/facilitator",
+      }),
+    ).toBe("walletAdapter=cdp facilitator=live");
+    expect(formatHealthIdentity({ ok: true, walletAdapter: "memory", facilitator: "test" })).toBe(
+      "walletAdapter=memory facilitator=test",
+    );
+    expect(formatHealthIdentity({ ok: true })).toBe("");
   });
 
   it("demo mode uses GET /wallets/wal_demo_agent", async () => {

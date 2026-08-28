@@ -31,6 +31,16 @@ export function cdpWalletMessage(): string {
   return "This market created a CDP wallet. Pay with test signature is disabled.";
 }
 
+/** Live-banner labels only. Never include facilitatorUrl or other secrets. */
+export function formatHealthIdentity(health: MarketHealth): string {
+  const parts: string[] = [];
+  const adapter = health.walletAdapter?.trim();
+  const facilitator = health.facilitator?.trim();
+  if (adapter) parts.push(`walletAdapter=${adapter}`);
+  if (facilitator) parts.push(`facilitator=${facilitator}`);
+  return parts.join(" ");
+}
+
 interface WalletStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

@@ -17,6 +17,7 @@ berth node up                             # http://127.0.0.1:7432 — loopback o
 berth pair --code ABCD-EFGH`;
 
 const LAPTOP_KIND = "laptop";
+const HOST_DESKTOP_KIND = "host-desktop";
 
 export function HostPage() {
   const [eligibility, setEligibility] = useState<
@@ -43,8 +44,8 @@ export function HostPage() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
-  function refuseLaptopInUi() {
-    const decision = decideListing({ kind: LAPTOP_KIND, class: "laptop" });
+  function refuseInUi(kind: string, listingClass: string) {
+    const decision = decideListing({ kind, class: listingClass });
     if (!decision.ok) {
       setLaptopError({ code: decision.code, message: decision.message });
     }
@@ -99,13 +100,21 @@ export function HostPage() {
         {eligibility.status === "ready" && (
           <>
             <p>
-              <span className={`pill ${eligibility.report.ok && classDecision?.ok ? "ok" : "bad"}`}>
+              <span
+                className={`pill ${eligibility.report.ok && classDecision?.ok ? "ok" : "bad"}`}
+                data-testid="eligibility-status"
+              >
                 {eligibility.report.ok && classDecision?.ok ? "eligible" : "refused"}
               </span>
-              <span className="mono">
+              <span className="mono" data-testid="eligibility-class">
                 class={eligibility.report.class} ok={String(eligibility.report.ok)}
               </span>
             </p>
+            {classDecision?.ok && (
+              <p className="meta" data-testid="eligibility-kind">
+                Eligible for <code>desktop.linux</code> listings (isolated guest, not the host desktop).
+              </p>
+            )}
             {classDecision && !classDecision.ok && (
               <p data-testid="eligibility-refused">
                 {classDecision.code}: {classDecision.message}
@@ -130,8 +139,21 @@ export function HostPage() {
         </p>
         <p className="meta">{forbiddenKindMessage("laptop")}</p>
         <div className="actions">
-          <button type="button" className="secondary" onClick={refuseLaptopInUi} data-testid="try-laptop">
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => refuseInUi(LAPTOP_KIND, "laptop")}
+            data-testid="try-laptop"
+          >
             Try listing a laptop
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => refuseInUi(HOST_DESKTOP_KIND, "host-desktop")}
+            data-testid="try-host-desktop"
+          >
+            Try listing a host desktop
           </button>
           <button type="button" className="secondary" onClick={() => void refuseLaptopViaMarket()}>
             Send laptop to market

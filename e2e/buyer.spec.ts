@@ -37,8 +37,14 @@ test.describe("buyer catalog and 402 → receipt", () => {
 
     await page.goto("/#/host");
     await expect(page.getByTestId("host-page")).toBeVisible();
+    await expect(page.getByTestId("eligibility-status")).toHaveText("eligible");
+    await expect(page.getByTestId("eligibility-class")).toContainText("vm-guest");
+    await expect(page.getByTestId("eligibility-kind")).toContainText("desktop.linux");
     await page.getByTestId("try-laptop").click();
     await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
     await expect(page.getByTestId("forbidden-class")).toContainText("laptop");
+    await page.getByTestId("try-host-desktop").click();
+    await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
+    await expect(page.getByTestId("forbidden-class")).toContainText("host-desktop");
   });
 });
