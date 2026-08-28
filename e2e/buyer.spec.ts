@@ -25,6 +25,10 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(page.getByTestId("lease-id")).toContainText("l_demo_lease");
     await expect(page.getByTestId("view-url")).toContainText("127.0.0.1");
     await expect(page.getByTestId("view-url")).toContainText("berth view");
+    await expect(page.getByTestId("view-url")).toContainText("berth mcp");
+    await page.getByRole("button", { name: "End lease" }).click();
+    await expect(page.getByTestId("receipt")).toContainText("occupancySeconds=60");
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
   });
 
   test("laptop listing is refused in the UI", async ({ page }) => {
@@ -64,8 +68,12 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(page.getByTestId("quote")).toContainText("HTTP 402");
     await page.getByTestId("pay-demo").click();
     await expect(page.getByTestId("lease-id")).toHaveText(/^l_/);
+    await expect(page.getByTestId("view-url")).toContainText("127.0.0.1");
+    await expect(page.getByTestId("view-url")).toContainText("berth view");
+    await expect(page.getByTestId("view-url")).toContainText("berth mcp");
     await page.getByRole("button", { name: "End lease" }).click();
     await expect(page.getByTestId("receipt")).toContainText("occupancySeconds=60");
     await expect(page.getByTestId("receipt")).toContainText("not a second charge");
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
   });
 });

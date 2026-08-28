@@ -67,6 +67,7 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(page.getByTestId("lease-id")).toHaveText(/^l_/);
     await expect(page.getByTestId("view-url")).toContainText("127.0.0.1");
     await expect(page.getByTestId("view-url")).toContainText("berth view");
+    await expect(page.getByTestId("view-url")).toContainText("berth mcp");
     const split = page.getByTestId("receipt-split");
     await expect(split).toContainText("receipt accounting");
     await expect(split).toContainText("100% USDC went to payTo");
@@ -74,6 +75,7 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await page.getByRole("button", { name: "End lease" }).click();
     await expect(receipt).toContainText("occupancySeconds=60");
     await expect(receipt).toContainText("not a second charge");
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
   });
 
   test("CDP / live facilitator health disables Pay with test signature", async ({ page }) => {
@@ -153,6 +155,7 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(page.getByTestId("lease-id")).toHaveText(/^l_/);
     await expect(page.getByTestId("view-url")).toContainText("127.0.0.1");
     await expect(page.getByTestId("view-url")).toContainText("berth view");
+    await expect(page.getByTestId("view-url")).toContainText("berth mcp");
     const split = page.getByTestId("receipt-split");
     await expect(split).toContainText("receipt accounting");
     await expect(split).toContainText("100% USDC went to payTo");
@@ -160,6 +163,7 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await page.getByRole("button", { name: "End lease" }).click();
     await expect(receipt).toContainText("occupancySeconds=60");
     await expect(receipt).toContainText("not a second charge");
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
 
     await page.getByRole("link", { name: "Host" }).click();
     await page.getByTestId("try-laptop").click();

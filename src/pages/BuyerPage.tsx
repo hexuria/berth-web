@@ -9,6 +9,9 @@ import { encodeDemoPaymentSignature, formatUsdcAtomic } from "../lib/payment";
 import { describeReceiptSplit } from "../lib/receipt-split";
 import type { Listing, PaymentRequired, Receipt, ViewUrl, Wallet } from "../lib/types";
 
+const ATTACH_COMMANDS = `berth view
+berth mcp`;
+
 interface QuoteState {
   listing: Listing;
   quote: PaymentRequired;
@@ -31,6 +34,7 @@ export function BuyerPage() {
   const [paid, setPaid] = useState<PaidState | undefined>();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | undefined>();
+  const [copied, setCopied] = useState(false);
   const demo = isDemoMode();
 
   useEffect(() => {
@@ -116,6 +120,12 @@ export function BuyerPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function copyAttach() {
+    await navigator.clipboard.writeText(ATTACH_COMMANDS);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   }
 
   async function onNewListing() {
@@ -269,13 +279,21 @@ export function BuyerPage() {
             <dd>{paid.receipt.network}</dd>
           </dl>
           {paid.view?.viewer_url && (
-            <p data-testid="view-url">
-              Guest view (not the host desktop):{" "}
-              <a href={paid.view.viewer_url} rel="noreferrer">
-                {paid.view.viewer_url}
-              </a>
-              . On the node host run <code>berth view</code>.
-            </p>
+            <div data-testid="view-url">
+              <p>
+                Guest view (not the host desktop):{" "}
+                <a href={paid.view.viewer_url} rel="noreferrer">
+                  {paid.view.viewer_url}
+                </a>
+                . On the node host attach to this leased guest — never the host desktop.
+              </p>
+              <pre className="commands">{ATTACH_COMMANDS}</pre>
+              <div className="actions">
+                <button type="button" className="secondary" onClick={() => void copyAttach()}>
+                  {copied ? "Copied" : "Copy attach commands"}
+                </button>
+              </div>
+            </div>
           )}
           {paid.receipt.leaseState === "ended" && (
             <p className="meta">
