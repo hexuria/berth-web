@@ -2,6 +2,10 @@
  * In-process MemoryWallet stand-in for Playwright live-proxy e2e.
  * Vite proxies /mkt (market) and /bos (lease view) → this process.
  * No secrets, no Docker, no real berth-market, no real Berthos, no wallets on /v1.
+ *
+ * GET /health defaults to walletAdapter=memory + facilitator=test.
+ * Override via query (?walletAdapter=cdp&facilitator=live&facilitatorUrl=…)
+ * or MOCK_WALLET_ADAPTER / MOCK_FACILITATOR / MOCK_FACILITATOR_URL — no keys.
  */
 import { createServer } from "node:http";
 
@@ -135,6 +139,16 @@ function decodePayment(headerValue) {
   return JSON.parse(Buffer.from(headerValue, "base64").toString("utf8"));
 }
 
+function healthIdentity(url) {
+  const walletAdapter =
+    url.searchParams.get("walletAdapter")?.trim() || process.env.MOCK_WALLET_ADAPTER?.trim() || "memory";
+  const facilitator =
+    url.searchParams.get("facilitator")?.trim() || process.env.MOCK_FACILITATOR?.trim() || "test";
+  const facilitatorUrl =
+    url.searchParams.get("facilitatorUrl")?.trim() || process.env.MOCK_FACILITATOR_URL?.trim() || "";
+  return { walletAdapter, facilitator, facilitatorUrl };
+}
+
 function decideListing(input) {
   const kind = typeof input.kind === "string" ? input.kind.trim() : "";
   if (kind && FORBIDDEN_KINDS.has(kind)) {
@@ -203,15 +217,19 @@ const server = createServer(async (req, res) => {
 
   try {
     if (req.method === "GET" && path === "/health") {
-      json(res, 200, {
+      const identity = healthIdentity(url);
+      const body = {
         ok: true,
         service: "berth-market",
         asset: "USDC",
         network: SEPOLIA,
         stagingNetwork: SEPOLIA,
-        walletAdapter: "memory",
+        walletAdapter: identity.walletAdapter,
+        facilitator: identity.facilitator,
         protocolCutBps: 1000,
-      });
+      };
+      if (identity.facilitatorUrl) body.facilitatorUrl = identity.facilitatorUrl;
+      json(res, 200, body);
       return;
     }
 

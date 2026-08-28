@@ -135,7 +135,7 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 - [ ] `npm ci && npm run lint && npm test && npm run test:e2e`
 - [ ] Buyer: catalog, 402, receipt
 - [ ] Laptop row refused (`forbidden_class`)
-- [ ] Host: commands visible; eligibility mocked
+- [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; laptop and host-desktop refused
 
 ### Live market + optional node
 

@@ -50,7 +50,7 @@ The page stays on `:5173`. It fetches **same-origin** `/mkt/*` and `/bos/*`. Vit
 | `/mkt` | `VITE_MARKET_URL` (e.g. `http://127.0.0.1:8787`) |
 | `/bos` | `VITE_BERTHOS_URL` (e.g. `http://127.0.0.1:7432`) |
 
-Default `npm start` on the market is **MemoryWallet** (no `WALLET_ADAPTER=cdp`). This UI then `POST /wallets/agent` + `POST /wallets/:id/fund` and enables **Pay with test signature** (`test:<walletId>`) so unpaid invoke → 402 → 200 works locally. If `/health` reports `walletAdapter=cdp` or a live `facilitatorUrl`, test-signature pay stays disabled and the page says so.
+Default `npm start` on the market is **MemoryWallet** (no `WALLET_ADAPTER=cdp`). This UI then `POST /wallets/agent` + `POST /wallets/:id/fund` and enables **Pay with test signature** (`test:<walletId>`) so unpaid invoke → 402 → 200 works locally. If `/health` reports `walletAdapter=cdp` or a live `facilitatorUrl`, test-signature pay stays disabled and the page says so. The live-mode banner shows `walletAdapter` and `facilitator` from `/health` (never `facilitatorUrl` or other secrets).
 
 Leave both env vars unset for demo MSW (CI default). Restart `npm run dev` after changing env. Do not set CDP keys, wallet secrets, or `NETWORK=eip155:8453` here.
 
@@ -67,7 +67,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | --- | --- |
 | `npm run lint` | ESLint + `tsc --noEmit` |
 | `npm test` | Vitest unit + MSW integration |
-| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + `desktop.linux`, no Docker) |
+| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + `desktop.linux` + CDP health disable + host eligibility, no Docker) |
 | `npm run build` | Production bundle |
 
 ## Talks to
@@ -85,7 +85,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | `GET` | `/wallets/:id` | Demo seed wallet, or the live test agent |
 | `GET` | `/receipts/:id` | Receipt (`onChainSettlement` when the market set it) |
 | `POST` | `/receipts/:id/end` | End Berthos lease; occupancy seconds, not a second charge |
-| `GET` | `/health` | Liveness (`walletAdapter` / `facilitatorUrl` when the market reports them) |
+| `GET` | `/health` | Liveness + identity (`walletAdapter` / `facilitator`; `facilitatorUrl` is not shown in the UI) |
 
 Demo and local MemoryWallet pay encode a v2 `PAYMENT-SIGNATURE` whose inner signature is `test:<walletId>` — the market's `TestFacilitator` format. Receipt **90/10** is accounting (`sellerAtomic` / `protocolAtomic`). When `onChainSettlement` is `payTo_100`, on-chain USDC went 100% to `payTo` — this UI does not call that a Base split. `cdp_split_90_10` is the only on-chain 90/10.
 
