@@ -5,8 +5,8 @@ Honest map. This repo is the **human UI**. Money is [hexuria/berth-market](https
 ```
 Role A — Host                         Role B — Buyer
 park a computer                       pay to use a listing
-berthos CLI (not this UI)             this UI → berth-market HTTP
-berth doctor / node up / pair         unpaid invoke → 402 → test:<walletId>
+berthos CLI: doctor / node up / pair  this UI → berth-market HTTP
+this UI: POST desktop.linux listing   unpaid invoke → 402 → test:<walletId>
 never host-desktop / laptop           receipt + leaseId
 eligibility: GET /v1/eligibility      berth view when a view URL exists
 ```
@@ -45,7 +45,7 @@ Open `http://127.0.0.1:5173/#/buyer`:
 2. A leaked `daily-driver.laptop` row is **refused** (`forbidden_class`) — never offered as a buyable listing.
 3. **Invoke unpaid** on `gpu-box.session` → HTTP 402 quote (`eip155:84532`).
 4. **Pay with test signature** → receipt, `leaseId`, and a mocked guest view URL (`GET /v1/leases/{id}/view`).
-5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report.
+5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row.
 
 That is enough for CI. It is **not** a live USDC transfer and **not** a real guest.
 
@@ -53,9 +53,9 @@ That is enough for CI. It is **not** a live USDC transfer and **not** a real gue
 
 ## Role A — Host / parking a computer
 
-Do the work in **berthos**, not here. This UI only shows the commands and, if `VITE_BERTHOS_URL` is set, `GET /v1/eligibility`.
+Doctor, `berth node up`, and pairing stay in **berthos**. This UI copies those commands, reads `GET /v1/eligibility` (mocked in demo / same-origin `/bos` in live), and — when the doctor is green for `vm-guest` — **Park guest on market** `POST /listings` as `kind=desktop.linux` on Base Sepolia (`eip155:84532`). It does not start Docker.
 
-Never rent the host desktop or a laptop. `class=laptop` and `host-desktop` are rejected on the node, again in berth-market, and again in this UI.
+Never rent the host desktop or a laptop. `class=laptop` and `host-desktop` are rejected on the node, again in berth-market, and again in this UI. The park control is not shown unless eligibility is an allowed guest class.
 
 On the parked box (Linux + Docker + Rust) — from the [berthos README](https://github.com/hexuria/berthos/blob/main/README.md):
 
@@ -79,7 +79,7 @@ export VITE_BERTHOS_URL=http://127.0.0.1:7432
 npm run dev
 ```
 
-The host page reads same-origin `/bos/v1/eligibility` (Vite → `:7432`). If the node is down, the page says so. It will not pretend Docker started.
+The host page reads same-origin `/bos/v1/eligibility` (Vite → `:7432`). If the node is down, the page says so. It will not pretend Docker started. A green `vm-guest` report enables **Park guest on market**; the buyer catalog then lists that guest. Laptop / host-desktop refuse buttons stay on the page.
 
 ---
 
@@ -113,7 +113,7 @@ Default market `npm start` is MemoryWallet (no `WALLET_ADAPTER=cdp`). The buyer 
 
 Buyer flow in the UI:
 
-1. Catalog = `GET /listings`. **New listing (Sepolia USDC)** posts an HTTP SKU on `eip155:84532`. Stored mainnet rows are not rewritten.
+1. Catalog = `GET /listings`. Host **Park guest on market** posts `desktop.linux` on `eip155:84532`. Buyer **New listing (Sepolia USDC)** posts an HTTP SKU the same way. Stored mainnet rows are not rewritten.
 2. Invoke unpaid = `GET /listings/:id/invoke` without `PAYMENT-SIGNATURE` → **402**.
 3. MemoryWallet / demo pay encodes a v2 payload whose signature is `test:<walletId>` (market `TestFacilitator`). A live Sepolia pay is **not** this UI; use the market's `npm run sepolia-loop`.
 4. 200 body: receipt. **90/10 is receipt accounting.** `onChainSettlement=payTo_100` means on-chain USDC went 100% to `payTo` — not a Base split. `cdp_split_90_10` is the only on-chain 90/10. `leaseId` for `desktop.linux`.
@@ -135,7 +135,7 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 - [ ] `npm ci && npm run lint && npm test && npm run test:e2e`
 - [ ] Buyer: catalog, 402, receipt
 - [ ] Laptop row refused (`forbidden_class`)
-- [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; laptop and host-desktop refused
+- [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; **Park guest on market** lists `desktop.linux` on Sepolia; buyer catalog shows it; laptop and host-desktop refused
 
 ### Live market + optional node
 

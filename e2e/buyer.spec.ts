@@ -47,4 +47,25 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
     await expect(page.getByTestId("forbidden-class")).toContainText("host-desktop");
   });
+
+  test("host parks eligible desktop.linux and buyer catalog shows it", async ({ page }) => {
+    await page.goto("/#/host");
+    await expect(page.getByTestId("eligibility-status")).toHaveText("eligible");
+    await expect(page.getByTestId("park-guest")).toBeVisible();
+    await page.getByTestId("park-listing").click();
+    await expect(page.getByTestId("parked-listing")).toContainText("desktop.linux");
+    await expect(page.getByTestId("parked-listing")).toContainText("eip155:84532");
+
+    await page.getByRole("link", { name: "Buyer" }).click();
+    const created = page.locator("[data-testid^='listing-parked.desktop.']").first();
+    await expect(created).toBeVisible();
+    await expect(created).toContainText("desktop.linux");
+    await created.getByRole("button", { name: "Invoke unpaid" }).click();
+    await expect(page.getByTestId("quote")).toContainText("HTTP 402");
+    await page.getByTestId("pay-demo").click();
+    await expect(page.getByTestId("lease-id")).toHaveText(/^l_/);
+    await page.getByRole("button", { name: "End lease" }).click();
+    await expect(page.getByTestId("receipt")).toContainText("occupancySeconds=60");
+    await expect(page.getByTestId("receipt")).toContainText("not a second charge");
+  });
 });

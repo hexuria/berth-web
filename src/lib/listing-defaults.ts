@@ -1,3 +1,4 @@
+import type { EligibilityAttestation } from "./types";
 import { BASE_CAIP2, BASE_SEPOLIA_CAIP2, USDC_BASE, USDC_BASE_SEPOLIA } from "./types";
 
 export const DEFAULT_LISTING_PAY_TO = "0x1111111111111111111111111111111111111111";
@@ -16,6 +17,17 @@ export interface NewHttpListingInput {
   price: { amount: string; asset: "USDC"; network: string };
   payTo: string;
   endpoint: { url: string; method: "GET" };
+}
+
+export interface NewDesktopListingInput {
+  kind: "desktop.linux";
+  title: string;
+  description: string;
+  price: { amount: string; asset: "USDC"; network: string };
+  payTo: string;
+  class: string;
+  fulfillment: { berthosUrl?: string; sku?: string; nodeId?: string };
+  eligibility: EligibilityAttestation;
 }
 
 /** Stored / explicit `eip155:8453` stays mainnet. Omitted network → Sepolia. */
@@ -76,5 +88,36 @@ export function newHttpListingInput(overrides?: {
     price: defaultListingPrice(overrides?.amount, overrides?.network),
     payTo: overrides?.payTo ?? DEFAULT_LISTING_PAY_TO,
     endpoint: { url: "https://api.example.com/weather", method: "GET" },
+  };
+}
+
+/**
+ * Host-park payload after a green doctor. Always `desktop.linux` — never
+ * laptop / host-desktop. Omitted network → Sepolia; explicit mainnet is kept.
+ */
+export function newDesktopListingInput(input: {
+  eligibility: EligibilityAttestation;
+  title?: string;
+  description?: string;
+  amount?: string;
+  network?: string;
+  payTo?: string;
+}): NewDesktopListingInput {
+  const title = input.title ?? `parked.desktop.${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+  return {
+    kind: "desktop.linux",
+    title,
+    description:
+      input.description ??
+      "Isolated Linux guest parked from a green doctor. Base Sepolia USDC (eip155:84532). Not a laptop or host desktop.",
+    price: defaultListingPrice(input.amount, input.network),
+    payTo: input.payTo ?? DEFAULT_LISTING_PAY_TO,
+    class: input.eligibility.class,
+    fulfillment: {
+      berthosUrl: input.eligibility.berthosUrl,
+      sku: "linux-desktop",
+      nodeId: input.eligibility.nodeId,
+    },
+    eligibility: input.eligibility,
   };
 }
