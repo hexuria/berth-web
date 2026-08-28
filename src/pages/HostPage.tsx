@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { fetchEligibility } from "../lib/berthos";
 import { isDemoMode } from "../lib/config";
-import { defaultListingPrice } from "../lib/listing-defaults";
+import { defaultListingPrice, newDesktopListingInput } from "../lib/listing-defaults";
 import { decideListing, forbiddenKindMessage } from "../lib/listing-guard";
 import { createListing } from "../lib/market";
-import type { EligibilityAttestation, MarketError } from "../lib/types";
+import type { EligibilityAttestation, Listing, MarketError } from "../lib/types";
 
 const PARK_COMMANDS = `# In hexuria/berthos — this UI does not run Docker or start a guest.
 cargo install --path crates/berthos-cli   # command name is \`berth\`
@@ -24,6 +24,9 @@ export function HostPage() {
     { status: "loading" } | { status: "ready"; report: EligibilityAttestation } | { status: "missing"; message: string }
   >({ status: "loading" });
   const [laptopError, setLaptopError] = useState<MarketError | undefined>();
+  const [parked, setParked] = useState<Listing | undefined>();
+  const [parkError, setParkError] = useState<MarketError | undefined>();
+  const [parkBusy, setParkBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -65,6 +68,30 @@ export function HostPage() {
       class: "laptop",
     });
     if (!result.ok) setLaptopError(result.error);
+  }
+
+  async function parkEligibleGuest() {
+    if (eligibility.status !== "ready") return;
+    const input = newDesktopListingInput({ eligibility: eligibility.report });
+    const decision = decideListing(input);
+    if (!decision.ok) {
+      setParked(undefined);
+      setParkError({ code: decision.code, message: decision.message });
+      return;
+    }
+    setParkBusy(true);
+    setParkError(undefined);
+    try {
+      const result = await createListing(input);
+      if (!result.ok) {
+        setParked(undefined);
+        setParkError(result.error);
+        return;
+      }
+      setParked(result.listing);
+    } finally {
+      setParkBusy(false);
+    }
   }
 
   const classDecision =
@@ -127,6 +154,35 @@ export function HostPage() {
                 </li>
               ))}
             </ul>
+            {classDecision?.ok && eligibility.report.ok && (
+              <div data-testid="park-guest">
+                <p className="meta">
+                  Doctor is green for an isolated guest. Post <code>kind=desktop.linux</code> on
+                  Base Sepolia (<code>eip155:84532</code>). Never laptop or host-desktop.
+                </p>
+                <div className="actions">
+                  <button
+                    type="button"
+                    disabled={parkBusy}
+                    onClick={() => void parkEligibleGuest()}
+                    data-testid="park-listing"
+                  >
+                    {parkBusy ? "Parking…" : "Park guest on market"}
+                  </button>
+                </div>
+                {parked && (
+                  <p data-testid="parked-listing">
+                    Listed <code>{parked.title}</code> as <code>{parked.kind}</code> on{" "}
+                    <code>{parked.price.network}</code>. Buyer catalog will show it.
+                  </p>
+                )}
+                {parkError && (
+                  <p data-testid="park-error">
+                    {parkError.code}: {parkError.message}
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
       </section>

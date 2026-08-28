@@ -124,6 +124,52 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(page.getByTestId("forbidden-class")).toContainText("host-desktop");
   });
 
+  test("host parks eligible desktop.linux; buyer catalog pays and ends lease", async ({ page }) => {
+    await page.goto("/#/host");
+    await expect(page.getByTestId("eligibility-status")).toHaveText("eligible");
+    await expect(page.getByTestId("park-guest")).toBeVisible();
+    await page.getByTestId("park-listing").click();
+    const parked = page.getByTestId("parked-listing");
+    await expect(parked).toBeVisible();
+    await expect(parked).toContainText("desktop.linux");
+    await expect(parked).toContainText("eip155:84532");
+
+    await page.getByRole("link", { name: "Buyer" }).click();
+    const created = page.locator("[data-testid^='listing-parked.desktop.']").first();
+    await expect(created).toBeVisible();
+    await expect(created).toContainText("desktop.linux");
+    await expect(created).toContainText("eip155:84532");
+    await created.getByRole("button", { name: "Invoke unpaid" }).click();
+
+    const quote = page.getByTestId("quote");
+    await expect(quote).toBeVisible();
+    await expect(quote).toContainText("HTTP 402");
+    await expect(quote).toContainText("eip155:84532");
+    await expect(page.getByTestId("pay-demo")).toBeEnabled();
+
+    await page.getByTestId("pay-demo").click();
+    const receipt = page.getByTestId("receipt");
+    await expect(receipt).toBeVisible();
+    await expect(page.getByTestId("lease-id")).toHaveText(/^l_/);
+    await expect(page.getByTestId("view-url")).toContainText("127.0.0.1");
+    await expect(page.getByTestId("view-url")).toContainText("berth view");
+    const split = page.getByTestId("receipt-split");
+    await expect(split).toContainText("receipt accounting");
+    await expect(split).toContainText("100% USDC went to payTo");
+
+    await page.getByRole("button", { name: "End lease" }).click();
+    await expect(receipt).toContainText("occupancySeconds=60");
+    await expect(receipt).toContainText("not a second charge");
+
+    await page.getByRole("link", { name: "Host" }).click();
+    await page.getByTestId("try-laptop").click();
+    await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
+    await expect(page.getByTestId("forbidden-class")).toContainText("laptop");
+    await page.getByTestId("try-host-desktop").click();
+    await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
+    await expect(page.getByTestId("forbidden-class")).toContainText("host-desktop");
+  });
+
   test("laptop listing is refused (forbidden_class) and is not invokable", async ({ page }) => {
     await page.goto("/#/buyer");
     const refused = page.getByTestId("refused-listing");

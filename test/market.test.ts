@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fetchViewUrl } from "../src/lib/berthos";
 import { decideListing } from "../src/lib/listing-guard";
 import { createAgent, createListing, fetchCatalog, fetchWallet, fundWallet, invokeListing } from "../src/lib/market";
-import { newHttpListingInput } from "../src/lib/listing-defaults";
+import { newDesktopListingInput, newHttpListingInput } from "../src/lib/listing-defaults";
 import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
   DEMO_DESKTOP_LISTING_ID,
@@ -10,6 +10,7 @@ import {
   DEMO_LAPTOP_LISTING_ID,
   DEMO_LEASE_ID,
   DEMO_VIEW_URL,
+  eligibleDoctorReport,
 } from "../src/mocks/data";
 import { DEMO_WALLET_ID } from "../src/lib/config";
 import { BASE_SEPOLIA_CAIP2 } from "../src/lib/types";
@@ -72,6 +73,28 @@ describe("mocked market integration", () => {
     });
     expect(mainnet.ok).toBe(true);
     if (mainnet.ok) expect(mainnet.listing.price.network).toBe("eip155:8453");
+  });
+
+  it("host park posts desktop.linux and buyer catalog can invoke it", async () => {
+    const created = await createListing(
+      newDesktopListingInput({ title: "parked.guest", eligibility: eligibleDoctorReport() }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.listing.kind).toBe("desktop.linux");
+    expect(created.listing.class).toBe("vm-guest");
+    expect(created.listing.price.network).toBe(BASE_SEPOLIA_CAIP2);
+
+    const titles = (await fetchCatalog()).map((row) => row.title);
+    expect(titles).toContain("parked.guest");
+
+    const unpaid = await invokeListing(created.listing.id);
+    expect(unpaid.status).toBe(402);
+    const wallet = await fetchWallet(DEMO_WALLET_ID);
+    const paid = await invokeListing(created.listing.id, encodeDemoPaymentSignature(unpaid.quote!, wallet));
+    expect(paid.status).toBe(200);
+    expect(paid.receipt?.leaseId).toMatch(/^l_/);
+    expect(paid.receipt?.network).toBe(BASE_SEPOLIA_CAIP2);
   });
 
   it("POST laptop listing is rejected with forbidden_class", async () => {

@@ -6,7 +6,7 @@ This repo is **not** the node and **not** the market. It is the human surface:
 
 | Role | What this UI does | What it does not do |
 | --- | --- | --- |
-| **Host** | Copy `berth doctor` / `berth node up` commands. Show eligibility if a Berthos URL is set (mocked in demo / CI). | Start Docker, a hypervisor, or a guest. |
+| **Host** | Copy `berth doctor` / `berth node up` commands. Show eligibility if a Berthos URL is set (mocked in demo / CI). When the doctor is green for `vm-guest`, park that guest as `kind=desktop.linux` on Sepolia. | Start Docker, a hypervisor, or a guest. List `laptop` / `host-desktop`. |
 | **Buyer** | Catalog, unpaid invoke → HTTP 402 quote, demo pay with `test:<walletId>`, receipt + `leaseId`, link to `berth view` when a view URL exists. | Hold keys. Settle USDC. Drive the host desktop. |
 
 Payments live in **berth-market** (x402, USDC, wallets, receipts, end lease). Isolation lives in **berthos** (doctor, loopback HTTP, labeled Linux guest). Two-role walkthrough: [docs/DEMO.md](docs/DEMO.md).
@@ -67,7 +67,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | --- | --- |
 | `npm run lint` | ESLint + `tsc --noEmit` |
 | `npm test` | Vitest unit + MSW integration |
-| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + `desktop.linux` + CDP health disable + host eligibility, no Docker) |
+| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + host-park `desktop.linux` + CDP health disable + host eligibility, no Docker) |
 | `npm run build` | Production bundle |
 
 ## Talks to
@@ -77,7 +77,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | Method | Path | Used for |
 | --- | --- | --- |
 | `GET` | `/listings` | Catalog |
-| `POST` | `/listings` | Refuse laptop / host-desktop (`forbidden_class`) |
+| `POST` | `/listings` | Host park of eligible `desktop.linux`; refuse laptop / host-desktop (`forbidden_class`) |
 | `GET` | `/listings/:id/invoke` | Unpaid → 402 + `PAYMENT-REQUIRED`; paid → receipt |
 | `POST` | `/wallets/treasury` | Seller / parent treasury (live MemoryWallet) |
 | `POST` | `/wallets/agent` | Capped child; live MemoryWallet bootstrap |
