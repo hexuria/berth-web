@@ -45,8 +45,9 @@ describe("listing-guard (same rejects as berth-market)", () => {
     }
   });
 
-  it("allows http and eligible desktop.linux", () => {
+  it("allows http, mcp, and eligible desktop.linux", () => {
     expect(decideListing({ kind: "http" }).ok).toBe(true);
+    expect(decideListing({ kind: "mcp" }).ok).toBe(true);
     expect(
       decideListing({
         kind: "desktop.linux",

@@ -13,6 +13,8 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     const catalogResponse = await listings;
     expect(catalogResponse.ok()).toBe(true);
     await expect(page.getByTestId("listing-weather.now")).toBeVisible();
+    await expect(page.getByTestId("listing-weather.tool")).toBeVisible();
+    await expect(page.getByTestId("listing-weather.tool")).toContainText("mcp");
     await expect(page.getByTestId("listing-gpu-box.session")).toBeVisible();
     await expect(page.getByTestId("listing-mainnet.stored")).toContainText("eip155:8453");
     await expect(page.getByTestId("new-listing")).toBeVisible();
@@ -38,6 +40,35 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(split).toContainText("100% USDC went to payTo");
     await expect(split).not.toContainText("CDP moved 90%");
     await expect(split).not.toContainText("USDC split on Base");
+  });
+
+  test("MemoryWallet pays MCP SKU; receipt is payTo_100 without a lease", async ({ page }) => {
+    await page.goto("/#/buyer");
+    const listing = page.getByTestId("listing-weather.tool");
+    await expect(listing).toBeVisible();
+    await expect(listing).toContainText("mcp");
+    await listing.getByRole("button", { name: "Invoke unpaid" }).click();
+
+    const quote = page.getByTestId("quote");
+    await expect(quote).toBeVisible();
+    await expect(quote).toContainText("HTTP 402");
+    await expect(quote).toContainText("MemoryWallet");
+    await expect(quote).toContainText("eip155:84532");
+    await expect(page.getByTestId("pay-demo")).toBeEnabled();
+
+    await page.getByTestId("pay-demo").click();
+    const receipt = page.getByTestId("receipt");
+    await expect(receipt).toBeVisible();
+    await expect(receipt).toContainText("eip155:84532");
+    const split = page.getByTestId("receipt-split");
+    await expect(split).toContainText("receipt accounting");
+    await expect(split).toContainText("100% USDC went to payTo");
+    await expect(split).not.toContainText("CDP moved 90%");
+    await expect(split).not.toContainText("USDC split on Base");
+    await expect(page.getByTestId("lease-id")).toHaveCount(0);
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "End lease" })).toHaveCount(0);
+    await expect(receipt).not.toContainText("occupancySeconds");
   });
 
   test("new listing helper stays on Sepolia and does not rewrite the stored mainnet row", async ({ page }) => {

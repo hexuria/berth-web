@@ -11,6 +11,8 @@ test.describe("buyer catalog and 402 → receipt", () => {
     const catalog = page.getByTestId("catalog");
     await expect(catalog).toBeVisible();
     await expect(page.getByTestId("listing-weather.now")).toBeVisible();
+    await expect(page.getByTestId("listing-weather.tool")).toBeVisible();
+    await expect(page.getByTestId("listing-weather.tool")).toContainText("mcp");
     await expect(page.getByTestId("listing-gpu-box.session")).toBeVisible();
 
     await page.getByTestId("listing-gpu-box.session").getByRole("button", { name: "Invoke unpaid" }).click();
@@ -29,6 +31,31 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await page.getByRole("button", { name: "End lease" }).click();
     await expect(page.getByTestId("receipt")).toContainText("occupancySeconds=60");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
+  });
+
+  test("MCP catalog row pays like HTTP: 402 then receipt, no lease", async ({ page }) => {
+    await page.goto("/#/buyer");
+    const listing = page.getByTestId("listing-weather.tool");
+    await expect(listing).toBeVisible();
+    await expect(listing).toContainText("mcp");
+    await listing.getByRole("button", { name: "Invoke unpaid" }).click();
+
+    const quote = page.getByTestId("quote");
+    await expect(quote).toBeVisible();
+    await expect(quote).toContainText("HTTP 402");
+    await expect(quote).toContainText("eip155:84532");
+
+    await page.getByTestId("pay-demo").click();
+    const receipt = page.getByTestId("receipt");
+    await expect(receipt).toBeVisible();
+    await expect(receipt).toContainText("eip155:84532");
+    const split = page.getByTestId("receipt-split");
+    await expect(split).toContainText("receipt accounting");
+    await expect(split).not.toContainText("CDP moved 90%");
+    await expect(page.getByTestId("lease-id")).toHaveCount(0);
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "End lease" })).toHaveCount(0);
+    await expect(receipt).not.toContainText("occupancySeconds");
   });
 
   test("laptop listing is refused in the UI", async ({ page }) => {
