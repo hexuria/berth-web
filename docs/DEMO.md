@@ -8,7 +8,7 @@ park a computer                       pay to use a listing
 berthos CLI: doctor / node up / pair  this UI → berth-market HTTP
 this UI: POST desktop.linux listing   unpaid invoke → 402 → test:<walletId>
 never host-desktop / laptop           receipt + leaseId
-eligibility: GET /v1/eligibility      berth view when a view URL exists
+eligibility: GET /v1/eligibility      berth view + berth mcp when a view URL exists
 ```
 
 | Claim | Actual state |
@@ -21,7 +21,7 @@ eligibility: GET /v1/eligibility      berth view when a view URL exists
 | BERTH token / own chain / AgentMail | Out. |
 | Custody / CDP in CI | None. No secrets required. |
 
-The market's own two-role notes (HTTP + loops, no SPA): [berth-market docs/DEMO.md](https://github.com/hexuria/berth-market/blob/main/docs/DEMO.md). Berthos session / `berth view`: [berthos docs/SESSION.md](https://github.com/hexuria/berthos/blob/main/docs/SESSION.md).
+The market's own two-role notes (HTTP + loops, no SPA): [berth-market docs/DEMO.md](https://github.com/hexuria/berth-market/blob/main/docs/DEMO.md). Berthos session / `berth view` / `berth mcp`: [berthos docs/SESSION.md](https://github.com/hexuria/berthos/blob/main/docs/SESSION.md).
 
 ---
 
@@ -44,7 +44,7 @@ Open `http://127.0.0.1:5173/#/buyer`:
 1. Catalog shows `weather.now` and `gpu-box.session`.
 2. A leaked `daily-driver.laptop` row is **refused** (`forbidden_class`) — never offered as a buyable listing.
 3. **Invoke unpaid** on `gpu-box.session` → HTTP 402 quote (`eip155:84532`).
-4. **Pay with test signature** → receipt, `leaseId`, and a mocked guest view URL (`GET /v1/leases/{id}/view`).
+4. **Pay with test signature** → receipt, `leaseId`, a mocked guest view URL (`GET /v1/leases/{id}/view`), and copyable `berth view` / `berth mcp` attach commands for that leased guest.
 5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row.
 
 That is enough for CI. It is **not** a live USDC transfer and **not** a real guest.
@@ -117,7 +117,7 @@ Buyer flow in the UI:
 2. Invoke unpaid = `GET /listings/:id/invoke` without `PAYMENT-SIGNATURE` → **402**.
 3. MemoryWallet / demo pay encodes a v2 payload whose signature is `test:<walletId>` (market `TestFacilitator`). A live Sepolia pay is **not** this UI; use the market's `npm run sepolia-loop`.
 4. 200 body: receipt. **90/10 is receipt accounting.** `onChainSettlement=payTo_100` means on-chain USDC went 100% to `payTo` — not a Base split. `cdp_split_90_10` is the only on-chain 90/10. `leaseId` for `desktop.linux`.
-5. Guest view needs a rebuilt `berthos-linux-desktop:v1` image on the node host (`docker build -t berthos-linux-desktop:v1 images/linux-desktop` in hexuria/berthos). Then `GET /v1/leases/{id}/view` can return `viewer_url`; run `berth view` there. That URL is loopback guest Xvfb, not the operator desktop.
+5. Guest view needs a rebuilt `berthos-linux-desktop:v1` image on the node host (`docker build -t berthos-linux-desktop:v1 images/linux-desktop` in hexuria/berthos). Then `GET /v1/leases/{id}/view` can return `viewer_url`; on that host run `berth view` (loopback guest Xvfb) or `berth mcp` (stdio attach to the same leased guest — never the operator desktop). End lease drops both.
 6. **End lease** = `POST /receipts/:id/end`. Occupancy seconds, `chargedHere: false`. Not a second x402.
 
 Unreachable node, red doctor, `class=laptop`, or 409 already-leased → market 4xx and **no charge**. This UI surfaces that error.
