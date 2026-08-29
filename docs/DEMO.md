@@ -42,7 +42,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173/#/buyer`:
 
-1. Catalog shows `weather.now` and `gpu-box.session`.
+1. Catalog shows `weather.now`, `gpu-box.session`, and a test-only `cdp-split.now` row (paid invoke stores `onChainSettlement=cdp_split_90_10` so the UI can show CDP honesty copy — no Coinbase).
 2. A leaked `daily-driver.laptop` row is **refused** (`forbidden_class`) — never offered as a buyable listing.
 3. **Invoke unpaid** on `gpu-box.session` → HTTP 402 quote (`eip155:84532`).
 4. **Pay with test signature** → receipt, `leaseId`, a mocked guest view URL (`GET /v1/leases/{id}/view`), and copyable `berth view` / `berth mcp` attach commands for that leased guest.
@@ -137,6 +137,7 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 - [ ] Buyer: catalog, 402, receipt
 - [ ] Laptop row refused (`forbidden_class`)
 - [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; **Park guest on market** lists `desktop.linux` on Sepolia; buyer catalog shows it; after pay + end lease, Host shows occupancySeconds and receipt-accounting 90/10; laptop and host-desktop refused
+- [ ] `cdp-split.now` pay shows CDP on-chain honesty copy on the buyer receipt and on Host `GET /receipts?listingId=` (label only; no Coinbase)
 
 ### Live market + optional node
 

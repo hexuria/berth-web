@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { assertHostCdpSplitForSeededListing, payCdpSplitListing } from "./cdp-split";
 
 test.describe("buyer catalog and 402 → receipt", () => {
   test("CI default is demo MSW (no live market, no CORS proxy needed)", async ({ page }) => {
@@ -56,6 +57,11 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(page.getByTestId("view-url")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "End lease" })).toHaveCount(0);
     await expect(receipt).not.toContainText("occupancySeconds");
+  });
+
+  test("CDP on-chain split copy on buyer receipt and host earn", async ({ page }) => {
+    await payCdpSplitListing(page);
+    await assertHostCdpSplitForSeededListing(page);
   });
 
   test("laptop listing is refused in the UI", async ({ page }) => {

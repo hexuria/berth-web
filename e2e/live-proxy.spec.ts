@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { assertHostCdpSplitForSeededListing, payCdpSplitListing } from "./cdp-split";
 
 test.describe("live Vite proxy (in-process mock market)", () => {
   test("banner is Live market and catalog arrives via /mkt", async ({ page }) => {
@@ -107,6 +108,11 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(receipt).toContainText("occupancySeconds=60");
     await expect(receipt).toContainText("not a second charge");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
+  });
+
+  test("CDP on-chain split copy on buyer receipt and host earn", async ({ page }) => {
+    await payCdpSplitListing(page);
+    await assertHostCdpSplitForSeededListing(page);
   });
 
   test("CDP / live facilitator health disables Pay with test signature", async ({ page }) => {

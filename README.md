@@ -67,7 +67,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | --- | --- |
 | `npm run lint` | ESLint + `tsc --noEmit` |
 | `npm test` | Vitest unit + MSW integration |
-| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + host-park `desktop.linux` → buyer pay → host occupancy/90-10 + CDP health disable + host eligibility, no Docker) |
+| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + host-park `desktop.linux` → buyer pay → host occupancy/90-10 + `cdp_split_90_10` honesty copy on buyer/host + CDP health disable + host eligibility, no Docker) |
 | `npm run build` | Production bundle |
 
 ## Talks to

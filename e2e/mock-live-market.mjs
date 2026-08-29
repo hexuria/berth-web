@@ -6,6 +6,9 @@
  * GET /health defaults to walletAdapter=memory + facilitator=test.
  * Override via query (?walletAdapter=cdp&facilitator=live&facilitatorUrl=…)
  * or MOCK_WALLET_ADAPTER / MOCK_FACILITATOR / MOCK_FACILITATOR_URL — no keys.
+ *
+ * Paid invokes default to onChainSettlement=payTo_100. lst_cdp_split (or
+ * ?onChainSettlement=cdp_split_90_10) stores the CDP 90/10 label only — no Coinbase.
  */
 import { createServer } from "node:http";
 
@@ -62,6 +65,18 @@ const listings = [
     description: "Stored mainnet row — must not be rewritten to Sepolia",
     price: { amount: "1000", asset: "USDC", network: MAINNET },
     payTo: SELLER,
+    createdAt: "2026-08-23T07:00:00.000Z",
+  },
+  {
+    // Test-only SKU: paid invoke stores cdp_split_90_10 (label only — no Coinbase).
+    id: "lst_cdp_split",
+    kind: "http",
+    title: "cdp-split.now",
+    description:
+      "Test-only HTTP SKU. Paid invoke stores onChainSettlement=cdp_split_90_10 so the UI can show CDP honesty copy. No Coinbase, no chain.",
+    price: { amount: "1000", asset: "USDC", network: SEPOLIA },
+    payTo: SELLER,
+    endpoint: { url: "https://api.example.com/cdp-split", method: "GET" },
     createdAt: "2026-08-23T07:00:00.000Z",
   },
   {
@@ -157,6 +172,15 @@ function healthIdentity(url) {
   const facilitatorUrl =
     url.searchParams.get("facilitatorUrl")?.trim() || process.env.MOCK_FACILITATOR_URL?.trim() || "";
   return { walletAdapter, facilitator, facilitatorUrl };
+}
+
+/** Label only. MemoryWallet pays stay payTo_100 unless this listing or query asks for the CDP copy. */
+function onChainSettlementFor(listing, url) {
+  const requested = url.searchParams.get("onChainSettlement");
+  if (requested === "cdp_split_90_10" || listing.id === "lst_cdp_split") {
+    return "cdp_split_90_10";
+  }
+  return "payTo_100";
 }
 
 function decideListing(input) {
@@ -328,7 +352,7 @@ const server = createServer(async (req, res) => {
         transaction: `0x${crypto.randomUUID().replaceAll("-", "")}`,
         network: listing.price.network,
         createdAt: new Date().toISOString(),
-        onChainSettlement: "payTo_100",
+        onChainSettlement: onChainSettlementFor(listing, url),
       };
       let fulfillment = { status: "accepted" };
       if (listing.kind === "desktop.linux") {
