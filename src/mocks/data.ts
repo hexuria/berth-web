@@ -9,6 +9,8 @@ export const DEMO_PROTOCOL_ADDRESS = "0x2222222222222222222222222222222222222222
 export const DEMO_HTTP_LISTING_ID = "lst_weather";
 export const DEMO_MCP_LISTING_ID = "lst_weather_tool";
 export const DEMO_DESKTOP_LISTING_ID = "lst_gpu";
+/** Test-only SKU: paid invoke stores `cdp_split_90_10` (label only — no Coinbase). */
+export const DEMO_CDP_SPLIT_LISTING_ID = "lst_cdp_split";
 export const DEMO_LAPTOP_LISTING_ID = "lst_laptop";
 export const DEMO_LEASE_ID = "l_demo_lease";
 export const DEMO_VIEW_URL = "http://127.0.0.1:17900/?token=demo-lease-bearer";
@@ -99,6 +101,17 @@ export function seedListings(): Listing[] {
         nodeId: "node_demo",
       },
       eligibility,
+      createdAt: "2026-08-23T07:00:00.000Z",
+    },
+    {
+      id: DEMO_CDP_SPLIT_LISTING_ID,
+      kind: "http",
+      title: "cdp-split.now",
+      description:
+        "Test-only HTTP SKU. Paid invoke stores onChainSettlement=cdp_split_90_10 so the UI can show CDP honesty copy. No Coinbase, no chain.",
+      price: defaultListingPrice(),
+      payTo: DEMO_SELLER_ADDRESS,
+      endpoint: { url: "https://api.example.com/cdp-split", method: "GET" },
       createdAt: "2026-08-23T07:00:00.000Z",
     },
     {

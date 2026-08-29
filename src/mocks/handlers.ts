@@ -2,10 +2,11 @@ import { http, HttpResponse } from "msw";
 import { DEMO_BERTHOS_URL, DEMO_MARKET_URL } from "../lib/config";
 import { withListingNetworkDefault } from "../lib/listing-defaults";
 import { decideListing } from "../lib/listing-guard";
-import type { Listing, PaymentPayload, PaymentRequired, Receipt, Wallet } from "../lib/types";
+import type { Listing, OnChainSettlement, PaymentPayload, PaymentRequired, Receipt, Wallet } from "../lib/types";
 import { BASE_SEPOLIA_CAIP2 } from "../lib/types";
 import { decodeX402Header, encodeX402Header, PAYMENT_REQUIRED_HEADER, PAYMENT_SIGNATURE_HEADER } from "../lib/x402";
 import {
+  DEMO_CDP_SPLIT_LISTING_ID,
   DEMO_DESKTOP_LISTING_ID,
   DEMO_LEASE_ID,
   DEMO_PROTOCOL_ADDRESS,
@@ -75,6 +76,15 @@ function splitProceeds(amountAtomic: string): { sellerAtomic: string; protocolAt
   const amount = BigInt(amountAtomic);
   const protocol = (amount * 1000n) / 10_000n;
   return { sellerAtomic: (amount - protocol).toString(), protocolAtomic: protocol.toString() };
+}
+
+/** Label only. Never a live CDP/Coinbase settle. */
+export function onChainSettlementFor(listingId: string, requestUrl: string): OnChainSettlement | undefined {
+  const requested = new URL(requestUrl).searchParams.get("onChainSettlement");
+  if (requested === "cdp_split_90_10" || listingId === DEMO_CDP_SPLIT_LISTING_ID) {
+    return "cdp_split_90_10";
+  }
+  return undefined;
 }
 
 export const handlers = [
@@ -160,6 +170,7 @@ export const handlers = [
     state.nonces.add(payload.payload.authorization.nonce);
 
     const { sellerAtomic, protocolAtomic } = splitProceeds(listing.price.amount);
+    const onChainSettlement = onChainSettlementFor(listing.id, request.url);
     const receipt: Receipt = {
       id: `rct_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`,
       listingId: listing.id,
@@ -173,6 +184,7 @@ export const handlers = [
       transaction: `0x${crypto.randomUUID().replaceAll("-", "")}`,
       network: listing.price.network,
       createdAt: new Date().toISOString(),
+      ...(onChainSettlement ? { onChainSettlement } : {}),
     };
 
     let fulfillment: Record<string, unknown> = {

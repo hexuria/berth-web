@@ -11,9 +11,11 @@ import {
   fundWallet,
   invokeListing,
 } from "../src/lib/market";
+import { onChainSettlementFor } from "../src/mocks/handlers";
 import { newDesktopListingInput, newHttpListingInput } from "../src/lib/listing-defaults";
 import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
+  DEMO_CDP_SPLIT_LISTING_ID,
   DEMO_DESKTOP_LISTING_ID,
   DEMO_HTTP_LISTING_ID,
   DEMO_MCP_LISTING_ID,
@@ -32,7 +34,9 @@ describe("mocked market integration", () => {
     expect(titles).toContain("weather.now");
     expect(titles).toContain("weather.tool");
     expect(titles).toContain("gpu-box.session");
+    expect(titles).toContain("cdp-split.now");
     expect(listings.some((row) => row.id === DEMO_MCP_LISTING_ID && row.kind === "mcp")).toBe(true);
+    expect(listings.some((row) => row.id === DEMO_CDP_SPLIT_LISTING_ID && row.kind === "http")).toBe(true);
     expect(listings.some((row) => row.id === DEMO_LAPTOP_LISTING_ID)).toBe(true);
   });
 
@@ -51,7 +55,38 @@ describe("mocked market integration", () => {
     expect(paid.receipt?.sellerAtomic).toBe("900");
     expect(paid.receipt?.protocolAtomic).toBe("100");
     expect(paid.receipt?.leaseId).toBeUndefined();
+    expect(paid.receipt?.onChainSettlement).toBeUndefined();
     expect(paid.fulfillment?.status).toBe("accepted");
+  });
+
+  it("onChainSettlementFor is label-only: seed id or query flag, never default MemoryWallet", () => {
+    expect(onChainSettlementFor("lst_cdp_split", "http://127.0.0.1:8787/listings/lst_cdp_split/invoke")).toBe(
+      "cdp_split_90_10",
+    );
+    expect(
+      onChainSettlementFor(
+        "lst_weather",
+        "http://127.0.0.1:8787/listings/lst_weather/invoke?onChainSettlement=cdp_split_90_10",
+      ),
+    ).toBe("cdp_split_90_10");
+    expect(onChainSettlementFor("lst_weather", "http://127.0.0.1:8787/listings/lst_weather/invoke")).toBeUndefined();
+  });
+
+  it("cdp-split SKU stores onChainSettlement for buyer pay and host poll", async () => {
+    const unpaid = await invokeListing(DEMO_CDP_SPLIT_LISTING_ID);
+    expect(unpaid.status).toBe(402);
+    const wallet = await fetchWallet(DEMO_WALLET_ID);
+    const paid = await invokeListing(DEMO_CDP_SPLIT_LISTING_ID, encodeDemoPaymentSignature(unpaid.quote!, wallet));
+    expect(paid.status).toBe(200);
+    expect(paid.receipt?.onChainSettlement).toBe("cdp_split_90_10");
+    expect(paid.receipt?.sellerAtomic).toBe("900");
+    expect(paid.receipt?.protocolAtomic).toBe("100");
+    expect(paid.receipt?.leaseId).toBeUndefined();
+
+    const listed = await fetchReceipts(DEMO_CDP_SPLIT_LISTING_ID);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.onChainSettlement).toBe("cdp_split_90_10");
+    expect(listed[0]?.listingId).toBe(DEMO_CDP_SPLIT_LISTING_ID);
   });
 
   it("mcp pay returns 200 without a lease or occupancy", async () => {
