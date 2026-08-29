@@ -8,7 +8,8 @@ park a computer                       pay to use a listing
 berthos CLI: doctor / node up / pair  this UI → berth-market HTTP
 this UI: POST desktop.linux listing   unpaid invoke → 402 → test:<walletId>
 never host-desktop / laptop           receipt + leaseId
-eligibility: GET /v1/eligibility      berth view + berth mcp when a view URL exists
+GET /receipts?listingId= → occupancy  berth view + berth mcp when a view URL exists
+and honest 90/10 earn                 (buyer page only; not a host-desktop viewer)
 ```
 
 | Claim | Actual state |
@@ -45,7 +46,7 @@ Open `http://127.0.0.1:5173/#/buyer`:
 2. A leaked `daily-driver.laptop` row is **refused** (`forbidden_class`) — never offered as a buyable listing.
 3. **Invoke unpaid** on `gpu-box.session` → HTTP 402 quote (`eip155:84532`).
 4. **Pay with test signature** → receipt, `leaseId`, a mocked guest view URL (`GET /v1/leases/{id}/view`), and copyable `berth view` / `berth mcp` attach commands for that leased guest.
-5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row.
+5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row. After the buyer pays and ends the lease, Host reads `GET /receipts?listingId=` and shows occupancy seconds plus receipt-accounting 90/10 (not an on-chain Base split when `onChainSettlement` is `payTo_100`).
 
 That is enough for CI. It is **not** a live USDC transfer and **not** a real guest.
 
@@ -79,7 +80,7 @@ export VITE_BERTHOS_URL=http://127.0.0.1:7432
 npm run dev
 ```
 
-The host page reads same-origin `/bos/v1/eligibility` (Vite → `:7432`). If the node is down, the page says so. It will not pretend Docker started. A green `vm-guest` report enables **Park guest on market**; the buyer catalog then lists that guest. Laptop / host-desktop refuse buttons stay on the page.
+The host page reads same-origin `/bos/v1/eligibility` (Vite → `:7432`). If the node is down, the page says so. It will not pretend Docker started. A green `vm-guest` report enables **Park guest on market**; the buyer catalog then lists that guest. After a paid invoke, Host polls same-origin `/mkt/receipts?listingId=` for occupancy and the receipt 90/10. Laptop / host-desktop refuse buttons stay on the page. Guest view stays on the buyer receipt.
 
 ---
 
@@ -135,7 +136,7 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 - [ ] `npm ci && npm run lint && npm test && npm run test:e2e`
 - [ ] Buyer: catalog, 402, receipt
 - [ ] Laptop row refused (`forbidden_class`)
-- [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; **Park guest on market** lists `desktop.linux` on Sepolia; buyer catalog shows it; laptop and host-desktop refused
+- [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; **Park guest on market** lists `desktop.linux` on Sepolia; buyer catalog shows it; after pay + end lease, Host shows occupancySeconds and receipt-accounting 90/10; laptop and host-desktop refused
 
 ### Live market + optional node
 

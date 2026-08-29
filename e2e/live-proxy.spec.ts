@@ -197,6 +197,19 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(page.getByTestId("view-url")).toHaveCount(0);
 
     await page.getByRole("link", { name: "Host" }).click();
+    const hostReceipt = page.getByTestId("host-receipt");
+    await expect(hostReceipt).toBeVisible();
+    await expect(page.getByTestId("host-lease-state")).toHaveText("ended");
+    await expect(page.getByTestId("host-occupancy")).toContainText("occupancySeconds=60");
+    const hostSplit = page.getByTestId("host-receipt-split");
+    await expect(hostSplit).toContainText("receipt accounting");
+    await expect(hostSplit).toContainText("90%");
+    await expect(hostSplit).toContainText("10%");
+    await expect(hostSplit).toContainText("100% USDC went to payTo");
+    await expect(hostSplit).not.toContainText("CDP moved 90%");
+    await expect(hostSplit).not.toContainText("USDC split on Base");
+    await expect(page.getByTestId("view-url")).toHaveCount(0);
+    await expect(page.getByTestId("host-earn")).not.toContainText("berth view");
     await page.getByTestId("try-laptop").click();
     await expect(page.getByTestId("forbidden-class")).toContainText("forbidden_class");
     await expect(page.getByTestId("forbidden-class")).toContainText("laptop");
