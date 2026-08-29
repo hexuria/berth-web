@@ -119,6 +119,16 @@ export async function fundWallet(id: string, amount: string): Promise<Wallet> {
   return body.wallet;
 }
 
+export async function fetchReceipts(listingId?: string): Promise<Receipt[]> {
+  const query = listingId ? `?listingId=${encodeURIComponent(listingId)}` : "";
+  const response = await fetch(`${marketUrl()}/receipts${query}`);
+  const body = await readJson<{ receipts?: Receipt[]; error?: MarketError }>(response);
+  if (!response.ok) {
+    throw new Error(asError(body, `GET /receipts → ${response.status}`).message);
+  }
+  return body.receipts ?? [];
+}
+
 export async function fetchReceipt(id: string): Promise<Receipt> {
   const response = await fetch(`${marketUrl()}/receipts/${id}`);
   const body = await readJson<{ receipt?: Receipt; error?: MarketError }>(response);

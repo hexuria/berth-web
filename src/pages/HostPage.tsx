@@ -3,8 +3,9 @@ import { fetchEligibility } from "../lib/berthos";
 import { isDemoMode } from "../lib/config";
 import { defaultListingPrice, newDesktopListingInput } from "../lib/listing-defaults";
 import { decideListing, forbiddenKindMessage } from "../lib/listing-guard";
-import { createListing } from "../lib/market";
-import type { EligibilityAttestation, Listing, MarketError } from "../lib/types";
+import { createListing, fetchReceipts } from "../lib/market";
+import { describeReceiptSplit } from "../lib/receipt-split";
+import type { EligibilityAttestation, Listing, MarketError, Receipt } from "../lib/types";
 
 const PARK_COMMANDS = `# In hexuria/berthos — this UI does not run Docker or start a guest.
 cargo install --path crates/berthos-cli   # command name is \`berth\`
@@ -18,16 +19,38 @@ berth pair --code ABCD-EFGH`;
 
 const LAPTOP_KIND = "laptop";
 const HOST_DESKTOP_KIND = "host-desktop";
+const PARKED_LISTING_KEY = "berth-web:parked-listing";
+const RECEIPT_POLL_MS = 2000;
+
+function readParkedListing(): Listing | undefined {
+  try {
+    const raw = sessionStorage.getItem(PARKED_LISTING_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Listing;
+    if (typeof parsed?.id !== "string" || !parsed.id) return undefined;
+    if (typeof parsed.kind !== "string" || typeof parsed.title !== "string") return undefined;
+    if (!parsed.price || typeof parsed.price.network !== "string") return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeParkedListing(listing: Listing): void {
+  sessionStorage.setItem(PARKED_LISTING_KEY, JSON.stringify(listing));
+}
 
 export function HostPage() {
   const [eligibility, setEligibility] = useState<
     { status: "loading" } | { status: "ready"; report: EligibilityAttestation } | { status: "missing"; message: string }
   >({ status: "loading" });
   const [laptopError, setLaptopError] = useState<MarketError | undefined>();
-  const [parked, setParked] = useState<Listing | undefined>();
+  const [parked, setParked] = useState<Listing | undefined>(readParkedListing);
   const [parkError, setParkError] = useState<MarketError | undefined>();
   const [parkBusy, setParkBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [receiptError, setReceiptError] = useState<string | undefined>();
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +63,30 @@ export function HostPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!parked) return;
+    const listingId = parked.id;
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = await fetchReceipts(listingId);
+        if (cancelled) return;
+        setReceipts(rows);
+        setReceiptError(undefined);
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setReceiptError(error instanceof Error ? error.message : "receipts failed");
+        }
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), RECEIPT_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [parked]);
 
   async function copyCommands() {
     await navigator.clipboard.writeText(PARK_COMMANDS);
@@ -76,6 +123,7 @@ export function HostPage() {
     const decision = decideListing(input);
     if (!decision.ok) {
       setParked(undefined);
+      sessionStorage.removeItem(PARKED_LISTING_KEY);
       setParkError({ code: decision.code, message: decision.message });
       return;
     }
@@ -85,10 +133,13 @@ export function HostPage() {
       const result = await createListing(input);
       if (!result.ok) {
         setParked(undefined);
+        sessionStorage.removeItem(PARKED_LISTING_KEY);
         setParkError(result.error);
         return;
       }
+      writeParkedListing(result.listing);
       setParked(result.listing);
+      setReceipts([]);
     } finally {
       setParkBusy(false);
     }
@@ -170,12 +221,6 @@ export function HostPage() {
                     {parkBusy ? "Parking…" : "Park guest on market"}
                   </button>
                 </div>
-                {parked && (
-                  <p data-testid="parked-listing">
-                    Listed <code>{parked.title}</code> as <code>{parked.kind}</code> on{" "}
-                    <code>{parked.price.network}</code>. Buyer catalog will show it.
-                  </p>
-                )}
                 {parkError && (
                   <p data-testid="park-error">
                     {parkError.code}: {parkError.message}
@@ -186,6 +231,52 @@ export function HostPage() {
           </>
         )}
       </section>
+
+      {parked && (
+        <section className="card" data-testid="host-earn">
+          <h2>Occupancy and earn</h2>
+          <p className="meta">
+            After a buyer pays this parked guest, this page reads{" "}
+            <code>GET /receipts?listingId={parked.id}</code> (demo MSW, or same-origin{" "}
+            <code>/mkt</code> in live). 90/10 is receipt accounting. Guest view stays on
+            the buyer receipt — this is not a host-desktop viewer.
+          </p>
+          <p data-testid="parked-listing">
+            Listed <code>{parked.title}</code> as <code>{parked.kind}</code> on{" "}
+            <code>{parked.price.network}</code>. Buyer catalog will show it.
+          </p>
+          {receiptError && <p className="status-line">{receiptError}</p>}
+          {receipts.length === 0 && !receiptError && (
+            <p className="meta" data-testid="host-earn-empty">
+              Waiting for a buyer to pay this listing. Occupancy and the 90/10 earn
+              appear on the receipt after a paid invoke.
+            </p>
+          )}
+          {receipts.map((receipt) => {
+            const split = describeReceiptSplit(receipt);
+            return (
+              <article key={receipt.id} data-testid="host-receipt">
+                <dl className="facts">
+                  <dt>receipt</dt>
+                  <dd className="mono">{receipt.id}</dd>
+                  <dt>leaseState</dt>
+                  <dd data-testid="host-lease-state">{receipt.leaseState ?? "—"}</dd>
+                  <dt>split</dt>
+                  <dd data-testid="host-receipt-split">
+                    {split.headline}
+                    {split.detail && <p className="meta">{split.detail}</p>}
+                  </dd>
+                </dl>
+                {receipt.leaseState === "ended" && (
+                  <p className="meta" data-testid="host-occupancy">
+                    occupancySeconds={receipt.occupancySeconds} (not a second charge).
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      )}
 
       <section className="card refused" data-testid="laptop-refuse">
         <h2>Laptop / host desktop</h2>

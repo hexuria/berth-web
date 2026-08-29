@@ -284,6 +284,13 @@ export const handlers = [
     return HttpResponse.json({ wallet });
   }),
 
+  http.get(`${DEMO_MARKET_URL}/receipts`, ({ request }) => {
+    const listingId = new URL(request.url).searchParams.get("listingId");
+    const all = [...state.receipts.values()];
+    const receipts = listingId ? all.filter((row) => row.listingId === listingId) : all;
+    return HttpResponse.json({ receipts });
+  }),
+
   http.get(`${DEMO_MARKET_URL}/receipts/:id`, ({ params }) => {
     const receipt = state.receipts.get(String(params.id));
     if (!receipt) {

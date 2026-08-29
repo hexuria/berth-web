@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { fetchViewUrl } from "../src/lib/berthos";
 import { decideListing } from "../src/lib/listing-guard";
-import { createAgent, createListing, fetchCatalog, fetchWallet, fundWallet, invokeListing } from "../src/lib/market";
+import {
+  createAgent,
+  createListing,
+  endReceipt,
+  fetchCatalog,
+  fetchReceipts,
+  fetchWallet,
+  fundWallet,
+  invokeListing,
+} from "../src/lib/market";
 import { newDesktopListingInput, newHttpListingInput } from "../src/lib/listing-defaults";
 import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
@@ -122,6 +131,27 @@ describe("mocked market integration", () => {
     expect(paid.status).toBe(200);
     expect(paid.receipt?.leaseId).toMatch(/^l_/);
     expect(paid.receipt?.network).toBe(BASE_SEPOLIA_CAIP2);
+
+    const live = await fetchReceipts(created.listing.id);
+    expect(live).toHaveLength(1);
+    expect(live[0]?.id).toBe(paid.receipt?.id);
+    expect(live[0]?.listingId).toBe(created.listing.id);
+    expect(live[0]?.leaseState).toBe("live");
+    expect(live[0]?.sellerAtomic).toBe("900");
+    expect(live[0]?.protocolAtomic).toBe("100");
+    expect(live[0]?.occupancySeconds).toBeUndefined();
+    expect(await fetchReceipts("lst_nobody")).toHaveLength(0);
+
+    const ended = await endReceipt(paid.receipt!.id);
+    expect(ended.error).toBeUndefined();
+    expect(ended.receipt.leaseState).toBe("ended");
+    const listed = await fetchReceipts(created.listing.id);
+    expect(listed[0]?.leaseState).toBe("ended");
+    expect(listed[0]?.occupancySeconds).toBe(60);
+    expect(listed[0]?.sellerAtomic).toBe("900");
+    expect(listed[0]?.protocolAtomic).toBe("100");
+    const all = await fetchReceipts();
+    expect(all.some((row) => row.id === paid.receipt?.id)).toBe(true);
   });
 
   it("POST laptop listing is rejected with forbidden_class", async () => {

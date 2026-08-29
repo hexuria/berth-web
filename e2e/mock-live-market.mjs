@@ -432,6 +432,14 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && path === "/receipts") {
+      const listingId = url.searchParams.get("listingId");
+      const all = [...receipts.values()];
+      const filtered = listingId ? all.filter((row) => row.listingId === listingId) : all;
+      json(res, 200, { receipts: filtered });
+      return;
+    }
+
     const getReceipt = path.match(/^\/receipts\/([^/]+)$/);
     if (req.method === "GET" && getReceipt) {
       const receipt = receipts.get(getReceipt[1]);
