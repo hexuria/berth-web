@@ -10,11 +10,14 @@ import {
   DEMO_DESKTOP_LISTING_ID,
   DEMO_LEASE_ID,
   DEMO_PROTOCOL_ADDRESS,
+  DEMO_SEPOLIA_TX_HASH,
+  DEMO_SEPOLIA_TX_LISTING_ID,
   DEMO_VIEW_URL,
   eligibleDoctorReport,
   quoteRequirements,
   seedListings,
   seedWallet,
+  testFacilitatorSettleId,
 } from "./data";
 
 interface MarketState {
@@ -84,7 +87,18 @@ export function onChainSettlementFor(listingId: string, requestUrl: string): OnC
   if (requested === "cdp_split_90_10" || listingId === DEMO_CDP_SPLIT_LISTING_ID) {
     return "cdp_split_90_10";
   }
+  if (requested === "payTo_100" || listingId === DEMO_SEPOLIA_TX_LISTING_ID) {
+    return "payTo_100";
+  }
   return undefined;
+}
+
+/** Realistic Sepolia hash vs test-facilitator id. Display only — no chain hop. */
+export function transactionFor(listingId: string): string {
+  if (listingId === DEMO_SEPOLIA_TX_LISTING_ID) {
+    return DEMO_SEPOLIA_TX_HASH;
+  }
+  return testFacilitatorSettleId(listingId);
 }
 
 export const handlers = [
@@ -181,7 +195,7 @@ export const handlers = [
       amountAtomic: listing.price.amount,
       sellerAtomic,
       protocolAtomic,
-      transaction: `0x${crypto.randomUUID().replaceAll("-", "")}`,
+      transaction: transactionFor(listing.id),
       network: listing.price.network,
       createdAt: new Date().toISOString(),
       ...(onChainSettlement ? { onChainSettlement } : {}),

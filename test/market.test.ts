@@ -11,7 +11,7 @@ import {
   fundWallet,
   invokeListing,
 } from "../src/lib/market";
-import { onChainSettlementFor } from "../src/mocks/handlers";
+import { onChainSettlementFor, transactionFor } from "../src/mocks/handlers";
 import { newDesktopListingInput, newHttpListingInput } from "../src/lib/listing-defaults";
 import { encodeDemoPaymentSignature } from "../src/lib/payment";
 import {
@@ -21,8 +21,11 @@ import {
   DEMO_MCP_LISTING_ID,
   DEMO_LAPTOP_LISTING_ID,
   DEMO_LEASE_ID,
+  DEMO_SEPOLIA_TX_HASH,
+  DEMO_SEPOLIA_TX_LISTING_ID,
   DEMO_VIEW_URL,
   eligibleDoctorReport,
+  testFacilitatorSettleId,
 } from "../src/mocks/data";
 import { DEMO_WALLET_ID } from "../src/lib/config";
 import { BASE_SEPOLIA_CAIP2 } from "../src/lib/types";
@@ -35,6 +38,7 @@ describe("mocked market integration", () => {
     expect(titles).toContain("weather.tool");
     expect(titles).toContain("gpu-box.session");
     expect(titles).toContain("cdp-split.now");
+    expect(titles).toContain("sepolia-settle.now");
     expect(listings.some((row) => row.id === DEMO_MCP_LISTING_ID && row.kind === "mcp")).toBe(true);
     expect(listings.some((row) => row.id === DEMO_CDP_SPLIT_LISTING_ID && row.kind === "http")).toBe(true);
     expect(listings.some((row) => row.id === DEMO_LAPTOP_LISTING_ID)).toBe(true);
@@ -56,6 +60,7 @@ describe("mocked market integration", () => {
     expect(paid.receipt?.protocolAtomic).toBe("100");
     expect(paid.receipt?.leaseId).toBeUndefined();
     expect(paid.receipt?.onChainSettlement).toBeUndefined();
+    expect(paid.receipt?.transaction).toBe(testFacilitatorSettleId(DEMO_HTTP_LISTING_ID));
     expect(paid.fulfillment?.status).toBe("accepted");
   });
 
@@ -70,6 +75,35 @@ describe("mocked market integration", () => {
       ),
     ).toBe("cdp_split_90_10");
     expect(onChainSettlementFor("lst_weather", "http://127.0.0.1:8787/listings/lst_weather/invoke")).toBeUndefined();
+    expect(
+      onChainSettlementFor("lst_sepolia_tx", "http://127.0.0.1:8787/listings/lst_sepolia_tx/invoke"),
+    ).toBe("payTo_100");
+  });
+
+  it("transactionFor is a Sepolia hash only for the sepolia-settle SKU", () => {
+    expect(transactionFor(DEMO_SEPOLIA_TX_LISTING_ID)).toBe(DEMO_SEPOLIA_TX_HASH);
+    expect(transactionFor(DEMO_HTTP_LISTING_ID)).toBe(testFacilitatorSettleId(DEMO_HTTP_LISTING_ID));
+    expect(transactionFor(DEMO_HTTP_LISTING_ID)).not.toMatch(/^0x[0-9a-fA-F]{64}$/);
+  });
+
+  it("sepolia-settle SKU stores a realistic hash and payTo_100 for explorer display", async () => {
+    const unpaid = await invokeListing(DEMO_SEPOLIA_TX_LISTING_ID);
+    expect(unpaid.status).toBe(402);
+    const wallet = await fetchWallet(DEMO_WALLET_ID);
+    const paid = await invokeListing(
+      DEMO_SEPOLIA_TX_LISTING_ID,
+      encodeDemoPaymentSignature(unpaid.quote!, wallet),
+    );
+    expect(paid.status).toBe(200);
+    expect(paid.receipt?.transaction).toBe(DEMO_SEPOLIA_TX_HASH);
+    expect(paid.receipt?.network).toBe(BASE_SEPOLIA_CAIP2);
+    expect(paid.receipt?.onChainSettlement).toBe("payTo_100");
+    expect(paid.receipt?.leaseId).toBeUndefined();
+
+    const listed = await fetchReceipts(DEMO_SEPOLIA_TX_LISTING_ID);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.transaction).toBe(DEMO_SEPOLIA_TX_HASH);
+    expect(listed[0]?.onChainSettlement).toBe("payTo_100");
   });
 
   it("cdp-split SKU stores onChainSettlement for buyer pay and host poll", async () => {

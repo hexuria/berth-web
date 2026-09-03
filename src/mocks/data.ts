@@ -11,9 +11,22 @@ export const DEMO_MCP_LISTING_ID = "lst_weather_tool";
 export const DEMO_DESKTOP_LISTING_ID = "lst_gpu";
 /** Test-only SKU: paid invoke stores `cdp_split_90_10` (label only — no Coinbase). */
 export const DEMO_CDP_SPLIT_LISTING_ID = "lst_cdp_split";
+/** Test-only SKU: paid invoke stores a realistic Base Sepolia tx hash (display only). */
+export const DEMO_SEPOLIA_TX_LISTING_ID = "lst_sepolia_tx";
+export const DEMO_SEPOLIA_TX_LISTING_TITLE = "sepolia-settle.now";
+/** Well-formed 64-hex hash. Not a live settle — mocks use it to exercise the explorer link. */
+export const DEMO_SEPOLIA_TX_HASH =
+  "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+export const DEMO_MAINNET_TX_HASH =
+  "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 export const DEMO_LAPTOP_LISTING_ID = "lst_laptop";
 export const DEMO_LEASE_ID = "l_demo_lease";
 export const DEMO_VIEW_URL = "http://127.0.0.1:17900/?token=demo-lease-bearer";
+
+/** TestFacilitator / MemoryWallet identifier — not an EVM tx hash. */
+export function testFacilitatorSettleId(listingId: string): string {
+  return `tf_settle_${listingId}`;
+}
 
 export function eligibleDoctorReport(now = new Date().toISOString()): EligibilityAttestation {
   return {
@@ -112,6 +125,17 @@ export function seedListings(): Listing[] {
       price: defaultListingPrice(),
       payTo: DEMO_SELLER_ADDRESS,
       endpoint: { url: "https://api.example.com/cdp-split", method: "GET" },
+      createdAt: "2026-08-23T07:00:00.000Z",
+    },
+    {
+      id: DEMO_SEPOLIA_TX_LISTING_ID,
+      kind: "http",
+      title: DEMO_SEPOLIA_TX_LISTING_TITLE,
+      description:
+        "Test-only HTTP SKU. Paid invoke stores a realistic Base Sepolia tx hash plus onChainSettlement=payTo_100 so the UI can show a Basescan Sepolia link. No live settle.",
+      price: defaultListingPrice(),
+      payTo: DEMO_SELLER_ADDRESS,
+      endpoint: { url: "https://api.example.com/sepolia-settle", method: "GET" },
       createdAt: "2026-08-23T07:00:00.000Z",
     },
     {

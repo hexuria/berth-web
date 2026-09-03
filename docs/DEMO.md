@@ -42,11 +42,12 @@ npm run dev
 
 Open `http://127.0.0.1:5173/#/buyer`:
 
-1. Catalog shows `weather.now`, `gpu-box.session`, and a test-only `cdp-split.now` row (paid invoke stores `onChainSettlement=cdp_split_90_10` so the UI can show CDP honesty copy — no Coinbase).
+1. Catalog shows `weather.now`, `gpu-box.session`, a test-only `cdp-split.now` row (paid invoke stores `onChainSettlement=cdp_split_90_10` so the UI can show CDP honesty copy — no Coinbase), and a test-only `sepolia-settle.now` row (stores a realistic Sepolia hash so the UI can show a Basescan link — no live settle).
 2. A leaked `daily-driver.laptop` row is **refused** (`forbidden_class`) — never offered as a buyable listing.
 3. **Invoke unpaid** on `gpu-box.session` → HTTP 402 quote (`eip155:84532`).
-4. **Pay with test signature** → receipt, `leaseId`, a mocked guest view URL (`GET /v1/leases/{id}/view`), and copyable `berth view` / `berth mcp` attach commands for that leased guest.
-5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row. After the buyer pays and ends the lease, Host reads `GET /receipts?listingId=` and shows occupancy seconds plus receipt-accounting 90/10 (not an on-chain Base split when `onChainSettlement` is `payTo_100`).
+4. **Pay with test signature** → receipt, `leaseId`, a mocked guest view URL (`GET /v1/leases/{id}/view`), and copyable `berth view` / `berth mcp` attach commands for that leased guest. The receipt's `transaction` is a test-facilitator id (`tf_settle_…`) — shown as text, not a Basescan link, with copy that it did not touch a chain.
+5. Host tab copies `berth doctor` / `berth node up`. Eligibility is the mocked doctor report. **Park guest on market** posts `kind=desktop.linux` on `eip155:84532`; the buyer catalog then shows that parked row. After the buyer pays and ends the lease, Host reads `GET /receipts?listingId=` and shows occupancy seconds, the same settle identifier (still not an explorer link), plus receipt-accounting 90/10 (not an on-chain Base split when `onChainSettlement` is `payTo_100`).
+6. Catalog also includes `sepolia-settle.now` (test-only). Paying it stores a realistic 64-hex hash + `onChainSettlement=payTo_100` so buyer and host can render a Basescan Sepolia link. That is display only — no live settle.
 
 That is enough for CI. It is **not** a live USDC transfer and **not** a real guest.
 
@@ -117,7 +118,7 @@ Buyer flow in the UI:
 1. Catalog = `GET /listings`. Host **Park guest on market** posts `desktop.linux` on `eip155:84532`. Buyer **New listing (Sepolia USDC)** posts an HTTP SKU the same way. Stored mainnet rows are not rewritten.
 2. Invoke unpaid = `GET /listings/:id/invoke` without `PAYMENT-SIGNATURE` → **402**.
 3. MemoryWallet / demo pay encodes a v2 payload whose signature is `test:<walletId>` (market `TestFacilitator`). A live Sepolia pay is **not** this UI; use the market's `npm run sepolia-loop`.
-4. 200 body: receipt. **90/10 is receipt accounting.** `onChainSettlement=payTo_100` means on-chain USDC went 100% to `payTo` — not a Base split. `cdp_split_90_10` is the only on-chain 90/10. `leaseId` for `desktop.linux`.
+4. 200 body: receipt. **90/10 is receipt accounting.** `onChainSettlement=payTo_100` means on-chain USDC went 100% to `payTo` — not a Base split. `cdp_split_90_10` is the only on-chain 90/10. `leaseId` for `desktop.linux`. `transaction` is the facilitator settle hash or a test-facilitator / MemoryWallet id. A 64-hex hash on `eip155:84532` links to Basescan Sepolia; `eip155:8453` uses mainnet Basescan (never rewritten). A non-hash id is shown without an explorer link and says it did not touch a chain.
 5. Guest view needs a rebuilt `berthos-linux-desktop:v1` image on the node host (`docker build -t berthos-linux-desktop:v1 images/linux-desktop` in hexuria/berthos). Then `GET /v1/leases/{id}/view` can return `viewer_url`; on that host run `berth view` (loopback guest Xvfb) or `berth mcp` (stdio attach to the same leased guest — never the operator desktop). End lease drops both.
 6. **End lease** = `POST /receipts/:id/end`. Occupancy seconds, `chargedHere: false`. Not a second x402.
 
@@ -138,6 +139,7 @@ Real testnet USDC stays in **berth-market** (`npm run sepolia-loop`). Needs a th
 - [ ] Laptop row refused (`forbidden_class`)
 - [ ] Host: commands visible; eligibility is vm-guest / desktop.linux; **Park guest on market** lists `desktop.linux` on Sepolia; buyer catalog shows it; after pay + end lease, Host shows occupancySeconds and receipt-accounting 90/10; laptop and host-desktop refused
 - [ ] `cdp-split.now` pay shows CDP on-chain honesty copy on the buyer receipt and on Host `GET /receipts?listingId=` (label only; no Coinbase)
+- [ ] Buyer + Host: `sepolia-settle.now` shows a Basescan Sepolia link + raw hash; `weather.now` / parked guest shows `tf_settle_…` and “did not touch a chain” (no explorer link)
 
 ### Live market + optional node
 

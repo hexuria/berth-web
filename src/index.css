@@ -206,6 +206,17 @@ dl.facts dt {
   color: var(--muted);
 }
 
+dl.facts dd[data-testid="receipt-tx"],
+dl.facts dd[data-testid="host-receipt-tx"] {
+  display: grid;
+  gap: 0.2rem;
+}
+
+dl.facts dd[data-testid="receipt-tx"] p.meta,
+dl.facts dd[data-testid="host-receipt-tx"] p.meta {
+  margin: 0.15rem 0 0;
+}
+
 .status-line {
   margin: 0.5rem 0 0;
 }

@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { assertHostCdpSplitForSeededListing, payCdpSplitListing } from "./cdp-split";
+import {
+  assertHostSepoliaTx,
+  assertHostTestFacilitatorTx,
+  paySepoliaSettleListing,
+  payTestFacilitatorListing,
+} from "./receipt-tx";
 
 test.describe("buyer catalog and 402 → receipt", () => {
   test("CI default is demo MSW (no live market, no CORS proxy needed)", async ({ page }) => {
@@ -64,6 +70,13 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await assertHostCdpSplitForSeededListing(page);
   });
 
+  test("Sepolia settle hash is a Basescan link; test-facilitator id is not", async ({ page }) => {
+    await paySepoliaSettleListing(page);
+    await assertHostSepoliaTx(page);
+    await payTestFacilitatorListing(page);
+    await assertHostTestFacilitatorTx(page);
+  });
+
   test("laptop listing is refused in the UI", async ({ page }) => {
     await page.goto("/#/buyer");
     const refused = page.getByTestId("refused-listing");
@@ -108,6 +121,8 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(page.getByTestId("receipt")).toContainText("occupancySeconds=60");
     await expect(page.getByTestId("receipt")).toContainText("not a second charge");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
+    await expect(page.getByTestId("receipt-tx-link")).toHaveCount(0);
+    await expect(page.getByTestId("receipt-tx-offchain")).toContainText("did not touch a chain");
 
     await page.getByRole("link", { name: "Host" }).click();
     const hostReceipt = page.getByTestId("host-receipt");
@@ -119,6 +134,8 @@ test.describe("buyer catalog and 402 → receipt", () => {
     await expect(hostSplit).toContainText("90%");
     await expect(hostSplit).toContainText("10%");
     await expect(hostSplit).not.toContainText("CDP moved 90%");
+    await expect(page.getByTestId("host-receipt-tx-link")).toHaveCount(0);
+    await expect(page.getByTestId("host-receipt-tx-offchain")).toContainText("did not touch a chain");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
     await expect(page.getByTestId("host-earn")).not.toContainText("berth view");
     await page.getByTestId("try-laptop").click();

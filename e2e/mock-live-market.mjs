@@ -9,6 +9,10 @@
  *
  * Paid invokes default to onChainSettlement=payTo_100. lst_cdp_split (or
  * ?onChainSettlement=cdp_split_90_10) stores the CDP 90/10 label only — no Coinbase.
+ *
+ * Transaction: lst_sepolia_tx stores a realistic Base Sepolia hash (explorer
+ * link). Other MemoryWallet pays store tf_settle_<listingId> (not a chain hop).
+ * lst_mainnet stores a mainnet hash so the UI can show basescan.org, never Sepolia.
  */
 import { createServer } from "node:http";
 
@@ -67,7 +71,7 @@ const listings = [
     payTo: SELLER,
     createdAt: "2026-08-23T07:00:00.000Z",
   },
-  {
+    {
     // Test-only SKU: paid invoke stores cdp_split_90_10 (label only — no Coinbase).
     id: "lst_cdp_split",
     kind: "http",
@@ -77,6 +81,18 @@ const listings = [
     price: { amount: "1000", asset: "USDC", network: SEPOLIA },
     payTo: SELLER,
     endpoint: { url: "https://api.example.com/cdp-split", method: "GET" },
+    createdAt: "2026-08-23T07:00:00.000Z",
+  },
+  {
+    // Test-only SKU: paid invoke stores a realistic Sepolia hash + payTo_100 (display only).
+    id: "lst_sepolia_tx",
+    kind: "http",
+    title: "sepolia-settle.now",
+    description:
+      "Test-only HTTP SKU. Paid invoke stores a realistic Base Sepolia tx hash plus onChainSettlement=payTo_100 so the UI can show a Basescan Sepolia link. No live settle.",
+    price: { amount: "1000", asset: "USDC", network: SEPOLIA },
+    payTo: SELLER,
+    endpoint: { url: "https://api.example.com/sepolia-settle", method: "GET" },
     createdAt: "2026-08-23T07:00:00.000Z",
   },
   {
@@ -174,6 +190,9 @@ function healthIdentity(url) {
   return { walletAdapter, facilitator, facilitatorUrl };
 }
 
+const SEPOLIA_TX_HASH = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+const MAINNET_TX_HASH = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 /** Label only. MemoryWallet pays stay payTo_100 unless this listing or query asks for the CDP copy. */
 function onChainSettlementFor(listing, url) {
   const requested = url.searchParams.get("onChainSettlement");
@@ -181,6 +200,13 @@ function onChainSettlementFor(listing, url) {
     return "cdp_split_90_10";
   }
   return "payTo_100";
+}
+
+/** Realistic Sepolia / stored-mainnet hash vs test-facilitator id. Display only. */
+function transactionFor(listing) {
+  if (listing.id === "lst_sepolia_tx") return SEPOLIA_TX_HASH;
+  if (listing.id === "lst_mainnet") return MAINNET_TX_HASH;
+  return `tf_settle_${listing.id}`;
 }
 
 function decideListing(input) {
@@ -349,7 +375,7 @@ const server = createServer(async (req, res) => {
         amountAtomic: listing.price.amount,
         sellerAtomic,
         protocolAtomic,
-        transaction: `0x${crypto.randomUUID().replaceAll("-", "")}`,
+        transaction: transactionFor(listing),
         network: listing.price.network,
         createdAt: new Date().toISOString(),
         onChainSettlement: onChainSettlementFor(listing, url),

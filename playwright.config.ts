@@ -14,8 +14,8 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
-    trace: "off",
-    video: "off",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
     screenshot: "off",
   },
   webServer: [
