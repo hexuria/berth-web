@@ -69,7 +69,7 @@ export async function assertHostSepoliaTx(page: Page): Promise<void> {
     { key: PARKED_LISTING_KEY, listing: SEEDED_SEPOLIA_PARKED },
   );
   await page.goto("/#/host");
-  const host = page.getByTestId("host-receipt");
+  const host = page.getByTestId("host-earn").getByTestId("host-receipt").first();
   await expect(host).toBeVisible();
   const link = host.getByTestId("host-receipt-tx-link");
   await expect(link).toBeVisible();
@@ -86,10 +86,10 @@ export async function assertHostTestFacilitatorTx(page: Page): Promise<void> {
     { key: PARKED_LISTING_KEY, listing: SEEDED_WEATHER_PARKED },
   );
   await page.goto("/#/host");
-  const host = page.getByTestId("host-receipt");
+  const host = page.getByTestId("host-earn").getByTestId("host-receipt").first();
   await expect(host).toBeVisible();
   await expect(host.getByTestId("host-receipt-tx-link")).toHaveCount(0);
   await expect(host.getByTestId("host-receipt-tx-id")).toHaveText(TEST_FACILITATOR_ID);
   await expect(host.getByTestId("host-receipt-tx-offchain")).toContainText("did not touch a chain");
-  await expect(page.getByTestId("host-earn")).not.toContainText("sepolia.basescan.org");
+  await expect(host).not.toContainText("sepolia.basescan.org");
 }
