@@ -67,7 +67,7 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | --- | --- |
 | `npm run lint` | ESLint + `tsc --noEmit` |
 | `npm test` | Vitest unit + MSW integration |
-| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + host-park `desktop.linux` → buyer pay → host occupancy/90-10 + `cdp_split_90_10` honesty copy on buyer/host + CDP health disable + host eligibility, no Docker) |
+| `npm run test:e2e` | Playwright Chromium: demo MSW + Vite `/mkt` + `/bos` against an in-process mock (HTTP + host-park `desktop.linux` → buyer pay → host occupancy/90-10 + settle tx (Basescan vs test-facilitator id) + `cdp_split_90_10` honesty copy on buyer/host + CDP health disable + host eligibility, no Docker) |
 | `npm run build` | Production bundle |
 
 ## Talks to
@@ -84,11 +84,13 @@ docker build -t berthos-linux-desktop:v1 images/linux-desktop
 | `POST` | `/wallets/:id/fund` | Test USDC for `test:<walletId>` |
 | `GET` | `/wallets/:id` | Demo seed wallet, or the live test agent |
 | `GET` | `/receipts` | Host occupancy / earn (`?listingId=` for the parked guest) |
-| `GET` | `/receipts/:id` | Receipt (`onChainSettlement` when the market set it) |
+| `GET` | `/receipts/:id` | Receipt (`transaction`, `network`, `onChainSettlement` when the market set them) |
 | `POST` | `/receipts/:id/end` | End Berthos lease; occupancy seconds, not a second charge |
 | `GET` | `/health` | Liveness + identity (`walletAdapter` / `facilitator`; `facilitatorUrl` is not shown in the UI) |
 
 Demo and local MemoryWallet pay encode a v2 `PAYMENT-SIGNATURE` whose inner signature is `test:<walletId>` — the market's `TestFacilitator` format. Receipt **90/10** is accounting (`sellerAtomic` / `protocolAtomic`). When `onChainSettlement` is `payTo_100`, on-chain USDC went 100% to `payTo` — this UI does not call that a Base split. `cdp_split_90_10` is the only on-chain 90/10.
+
+Paid receipts also show `transaction` + `network` (buyer receipt and host occupancy). A 64-hex hash on `eip155:84532` is a [Basescan Sepolia](https://sepolia.basescan.org) link plus the raw hash. A stored `eip155:8453` hash uses [basescan.org](https://basescan.org) and is never rewritten to Sepolia. A test-facilitator / MemoryWallet identifier is shown as-is with copy that it did not touch a chain — never dressed as an explorer link. Missing `transaction` renders nothing (no empty link, no `undefined`). This UI does not invent a `settledOnChain` flag; berth-market's TestFacilitator can store a 64-hex `newTxHash()` that looks like a real settle.
 
 New listings (demo seed + the buyer **New listing** helper) default to **Base Sepolia** (`eip155:84532`) / Sepolia USDC. A stored `eip155:8453` row is shown as-is and is not rewritten.
 

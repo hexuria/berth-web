@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { assertHostCdpSplitForSeededListing, payCdpSplitListing } from "./cdp-split";
+import {
+  assertHostSepoliaTx,
+  assertHostTestFacilitatorTx,
+  paySepoliaSettleListing,
+  payTestFacilitatorListing,
+} from "./receipt-tx";
 
 test.describe("live Vite proxy (in-process mock market)", () => {
   test("banner is Live market and catalog arrives via /mkt", async ({ page }) => {
@@ -41,6 +47,8 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(split).toContainText("100% USDC went to payTo");
     await expect(split).not.toContainText("CDP moved 90%");
     await expect(split).not.toContainText("USDC split on Base");
+    await expect(page.getByTestId("receipt-tx-link")).toHaveCount(0);
+    await expect(page.getByTestId("receipt-tx-offchain")).toContainText("did not touch a chain");
   });
 
   test("MemoryWallet pays MCP SKU; receipt is payTo_100 without a lease", async ({ page }) => {
@@ -82,6 +90,19 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(page.getByTestId("listing-mainnet.stored")).toContainText("eip155:8453");
   });
 
+  test("stored mainnet pay uses mainnet Basescan, never Sepolia", async ({ page }) => {
+    await page.goto("/#/buyer");
+    await page.getByTestId("listing-mainnet.stored").getByRole("button", { name: "Invoke unpaid" }).click();
+    await expect(page.getByTestId("quote")).toBeVisible();
+    await page.getByTestId("pay-demo").click();
+    const receipt = page.getByTestId("receipt");
+    await expect(receipt).toBeVisible();
+    const link = receipt.getByTestId("receipt-tx-link");
+    await expect(link).toHaveAttribute("href", /^https:\/\/basescan\.org\/tx\/0x[0-9a-fA-F]{64}$/);
+    await expect(link).not.toHaveAttribute("href", /sepolia/);
+    await expect(receipt).toContainText("eip155:8453");
+  });
+
   test("paid desktop.linux returns occupancy lease and a loopback berth view URL", async ({ page }) => {
     await page.goto("/#/buyer");
     await expect(page.getByTestId("listing-gpu-box.session")).toBeVisible();
@@ -113,6 +134,13 @@ test.describe("live Vite proxy (in-process mock market)", () => {
   test("CDP on-chain split copy on buyer receipt and host earn", async ({ page }) => {
     await payCdpSplitListing(page);
     await assertHostCdpSplitForSeededListing(page);
+  });
+
+  test("Sepolia settle hash is a Basescan link; test-facilitator id is not", async ({ page }) => {
+    await paySepoliaSettleListing(page);
+    await assertHostSepoliaTx(page);
+    await payTestFacilitatorListing(page);
+    await assertHostTestFacilitatorTx(page);
   });
 
   test("CDP / live facilitator health disables Pay with test signature", async ({ page }) => {
@@ -201,6 +229,8 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(receipt).toContainText("occupancySeconds=60");
     await expect(receipt).toContainText("not a second charge");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
+    await expect(page.getByTestId("receipt-tx-link")).toHaveCount(0);
+    await expect(page.getByTestId("receipt-tx-offchain")).toContainText("did not touch a chain");
 
     await page.getByRole("link", { name: "Host" }).click();
     const hostReceipt = page.getByTestId("host-receipt");
@@ -214,6 +244,8 @@ test.describe("live Vite proxy (in-process mock market)", () => {
     await expect(hostSplit).toContainText("100% USDC went to payTo");
     await expect(hostSplit).not.toContainText("CDP moved 90%");
     await expect(hostSplit).not.toContainText("USDC split on Base");
+    await expect(page.getByTestId("host-receipt-tx-link")).toHaveCount(0);
+    await expect(page.getByTestId("host-receipt-tx-offchain")).toContainText("did not touch a chain");
     await expect(page.getByTestId("view-url")).toHaveCount(0);
     await expect(page.getByTestId("host-earn")).not.toContainText("berth view");
     await page.getByTestId("try-laptop").click();

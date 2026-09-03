@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ReceiptTransaction } from "../components/ReceiptTransaction";
 import { fetchEligibility } from "../lib/berthos";
 import { isDemoMode } from "../lib/config";
 import { defaultListingPrice, newDesktopListingInput } from "../lib/listing-defaults";
@@ -238,8 +239,10 @@ export function HostPage() {
           <p className="meta">
             After a buyer pays this parked guest, this page reads{" "}
             <code>GET /receipts?listingId={parked.id}</code> (demo MSW, or same-origin{" "}
-            <code>/mkt</code> in live). 90/10 is receipt accounting. Guest view stays on
-            the buyer receipt — this is not a host-desktop viewer.
+            <code>/mkt</code> in live). 90/10 is receipt accounting. A paid receipt's{" "}
+            <code>transaction</code> is the settle hash or a test-facilitator id — only a
+            real 64-hex hash on a known CAIP-2 becomes an explorer link. Guest view stays
+            on the buyer receipt — this is not a host-desktop viewer.
           </p>
           <p data-testid="parked-listing">
             Listed <code>{parked.title}</code> as <code>{parked.kind}</code> on{" "}
@@ -259,6 +262,7 @@ export function HostPage() {
                 <dl className="facts">
                   <dt>receipt</dt>
                   <dd className="mono">{receipt.id}</dd>
+                  <ReceiptTransaction receipt={receipt} testId="host-receipt-tx" />
                   <dt>leaseState</dt>
                   <dd data-testid="host-lease-state">{receipt.leaseState ?? "—"}</dd>
                   <dt>split</dt>

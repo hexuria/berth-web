@@ -94,7 +94,12 @@ export interface Receipt {
   amountAtomic: string;
   sellerAtomic: string;
   protocolAtomic: string;
+  /**
+   * Facilitator settle hash, or a test-facilitator / MemoryWallet identifier.
+   * berth-market always stores a string; empty/absent is shown as nothing.
+   */
   transaction: string;
+  /** CAIP-2 as stored on the listing (`eip155:84532` or `eip155:8453`). */
   network: string;
   createdAt: string;
   leaseId?: string;

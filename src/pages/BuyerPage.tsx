@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ReceiptTransaction } from "../components/ReceiptTransaction";
 import { fetchViewUrl } from "../lib/berthos";
 import { isDemoMode } from "../lib/config";
 import { decideListing } from "../lib/listing-guard";
@@ -260,8 +261,7 @@ export function BuyerPage() {
           <dl className="facts">
             <dt>receipt</dt>
             <dd className="mono">{paid.receipt.id}</dd>
-            <dt>transaction</dt>
-            <dd className="mono">{paid.receipt.transaction}</dd>
+            <ReceiptTransaction receipt={paid.receipt} />
             <dt>split</dt>
             <dd data-testid="receipt-split">
               {receiptSplit?.headline}
